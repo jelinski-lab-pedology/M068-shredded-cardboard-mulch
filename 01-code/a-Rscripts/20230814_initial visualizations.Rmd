@@ -1,0 +1,337 @@
+---
+title: "20230805_initial visuals"
+author: "Jennifer Nicklay"
+date: "2023-08-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r libraries}
+
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(RColorBrewer)
+library(ragg)
+
+```
+
+
+```{r uploading data}
+
+#working directory should be set to Grad School -> Cardboard Mulch -> Data -> Analysis -> mulchproject
+biomass <- read.csv('20230814_SCM-Weed Biomass-UMN-weed density.csv', header = TRUE)
+labor <- read.csv('20230814_SCM-Weeding Labor-UMN.csv',header=TRUE)
+yield <- read.csv('20230805_SCM-yield-UMN.csv',header=TRUE)
+
+
+```
+
+```{r variable check}
+
+#checking block-plot-treatment-crop combos. Creating a new column (ID) that concatenates the four individual columns using a hyphen as a separator. It will remove NAs as I currently have it set up, which means that if any are blank, I'll have to add code to fill in treatments / crops before this line. The original columns are not removed. Run this code once every time you are working with an updated datasheet, then comment it out
+
+
+var_check_yield <- yield %>% unite("ID",
+                             block,plot,treatment,crop,
+                             sep = "-", 
+                             na.rm = TRUE, 
+                             remove=FALSE)
+
+#changing variable type of ID so that I can easily check how many levels there are
+
+var_check_yield$ID <- as.factor(var_check_yield$ID)
+
+#should be 45 levels
+var_check_biomass <- biomass %>% unite("ID",
+                             block,plot,treatment,crop,
+                             sep = "-", 
+                             na.rm = TRUE, 
+                             remove=FALSE)
+
+var_check_biomass$ID <- as.factor(var_check_biomass$ID)
+
+str(var_check_biomass$ID)
+
+var_check_labor <- labor %>% unite("ID",
+                             block,plot,treatment,crop,
+                             sep = "-", 
+                             na.rm = TRUE, 
+                             remove=FALSE)
+
+var_check_labor$ID <- as.factor(var_check_labor$ID)
+
+str(var_check_labor$ID)
+
+
+levels(var_check_labor$ID)
+
+
+```
+
+```{r initial visualizations of biomass}
+
+#Excluding three types of data right now. First, excluding all block 5 plots, because we didn't fertilize any of the blocks this year and I don't want to add unnecessary complications to the initial visualizations with the now extraneous no-fertilizer block. Second, excluding the first time we tried to collect biomass, before the mulch was down, but had to abort because it was taking WAY too long. Finally, excluding most recent date, because we don't have the oven-dried mass yet
+biomass <- biomass %>% subset(include.in.analysis. != "N")
+
+biomass$treatment <- as.factor(biomass$treatment)
+biomass$crop <- as.factor(biomass$crop)
+
+#simplifying the dates, so it's easier to do a line graph later potentially
+biomass$date_collected <- replace(biomass$date_collected,
+                                  biomass$ date_collected == "21Jul2023",
+                                  "20Jul2023")
+
+#changing the variable type for date_collected to date
+biomass$date_collected <- as.Date(biomass$date_collected,format='%d%b%Y')
+
+#replacing all negative oven-dried biomass values with 0
+biomass$od_biomass_calculated_g <- replace(biomass$od_biomass_calculated_g,
+                                           biomass$od_biomass_calculated_g < 0,
+                                           0)
+
+#graphing the biomass by treatment, with the ANOVA and tukey to go with it. also ran biomass by crop, and biomass by treatment + crop + treatment:crop, but it's treatment that is most significant, and I didn't feel like messing with pairwise comparisons. TBD for when we have more data
+
+mass_by_trt <- ggplot(biomass,aes(x=treatment, 
+                                  y=od_biomass_calculated_g, 
+                                  fill = treatment
+                                  )) + 
+                          geom_boxplot() + 
+                          labs(fill = "treatment") +
+                          xlab("Treatment") + 
+                          ylab("Dry Biomass (grams) / plot") +
+                          theme(legend.position="none",
+                                plot.title = element_text(hjust = 0.5),
+                                axis.title.x = element_text(vjust = -2)) +
+                          ggtitle("Dry Biomass of Weeds")
+mass_by_trt
+
+
+#temp <- fs::path(knitr::fig_path(),"biomass_by_treatment.png")
+#agg_png(temp, width = 7, height = 4, units = "in", res = 300)
+#plot(mass_by_trt)
+#dev.off()
+#knitr::include_graphics(temp)
+
+anova <- aov(od_biomass_calculated_g ~ treatment, biomass)
+summary(anova)
+
+tukey <- TukeyHSD(x=anova, "treatment", conf.level = 0.95)
+tukey
+                   
+#super initial graph. Just shows the decrease in weed biomass for bare soil and straw mulch, not something I need to run stats on. just interesting
+
+
+mass_by_date <- ggplot(biomass, aes(x=treatment, 
+                                    y=od_biomass_calculated_g,
+                                    fill=treatment)) +   
+                geom_boxplot() + 
+                facet_grid(~date_collected) +
+                labs(fill = "treatment") + 
+                xlab("Treatment") + 
+                ylab("Dry Biomass (grams) / plot") +
+                theme(legend.position="none",
+                      plot.title = element_text(hjust = 0.5),
+                      axis.title.x = element_text(vjust = -2)) +
+                ggtitle("Changes in Weed Biomass across July") 
+mass_by_date
+
+biomass <- group_by(biomass,treatment)
+
+biomass_summary <- summarize(biomass,
+                             mean_treatment = mean(od_biomass_calculated_g,na.rm=T)
+                             )
+
+biomass <- ungroup(biomass)
+
+mass_by_trt_bar <- ggplot(biomass_summary, aes(x=factor(treatment, level=c('BM', 'SM', 'CM')), 
+                                    y=mean_treatment,fill=treatment)) +   
+                geom_bar(stat = "identity") +
+                scale_x_discrete(labels=c("No Mulch", "Straw", "Shredded Cardboard")) +
+                xlab("Type of Mulch") +
+                ylab("Average Weight of Dried Weeds (in grams)") +
+                theme_bw() + 
+                theme_light() + 
+                theme(legend.position="none",
+                      axis.title.y = element_text(vjust = 2),
+                      axis.text = element_text(size = 14),
+                      panel.grid.major.y = element_line(size = 0.5, color = "#f0f0f0"), 
+                      panel.grid.major.x = element_blank(), 
+                      panel.grid.minor.x = element_blank(),  
+                      axis.title.x = element_blank(),
+                      strip.background = element_rect(fill = "#787878")) +
+                scale_fill_manual(values = c("#1B9E77","#6A3D9A","#CAB2D6"))
+
+mass_by_trt_bar
+
+temp <- fs::path(knitr::fig_path(),"weed_biomass.png")
+agg_png(temp, width = 7, height = 5, units = "in", res = 300)
+plot(mass_by_trt_bar)
+dev.off()
+knitr::include_graphics(temp)
+
+mass_by_date_line <- ggplot(biomass, aes(x=date_collected, 
+                                    y=od_biomass_calculated_g,
+                                    color=treatment)) +   
+                geom_point() + 
+                geom_smooth(method=lm) +
+                labs(color = "treatment") + 
+                ylim(0,23) +
+                xlab("Date") + 
+                ylab("Mass (grams) of dry weeds")  
+
+mass_by_date_line
+
+
+
+brewer.pal(n = 8, name = "Dark2")
+
+```
+
+
+
+
+```{r initial visualizations of labor hours}
+#Excluding block 5 to reduce complications and the most recent data collection date, since we haven't finished yet
+
+labor$date_collected <- replace(labor$date_collected,
+                                labor$date_collected == "10Jul2023",
+                                  "07Jul2023")
+
+labor$date_collected <- replace(labor$date_collected,
+                                labor$date_collected == "11Jul2023",
+                                  "07Jul2023")
+
+labor$date_collected <- replace(labor$date_collected,
+                                labor$date_collected == "13Jul2023",
+                                  "07Jul2023")
+
+labor$date_collected <- replace(labor$date_collected,
+                                labor$date_collected == "04Aug2023",
+                                  "02Aug2023")
+
+labor$date_collected <- replace(labor$date_collected,
+                                labor$date_collected == "09Aug2023",
+                                  "02Aug2023")
+
+labor$date_collected <- replace(labor$date_collected,
+                                labor$date_collected == "10Aug2023",
+                                  "02Aug2023")
+
+labor$date_collected <- as.Date(labor$date_collected,format='%d%b%Y')
+
+labor$treatment <- as.factor(labor$treatment)
+labor$crop <- as.factor(labor$crop)
+labor$collected_by <- as.factor(labor$collected_by)
+
+#total time is a character variable, and it needs to be numeric or integer. first separating into two separate columns, then changing variable type, then integrating the hours into minutes. columns created for calculations are removed before moving on
+labor <- labor %>% separate(total.time,c('hours','minutes'),sep =":",remove=FALSE)
+labor$hours <- as.integer(labor$hours)
+labor$minutes <- as.integer(labor$minutes)
+
+labor$total.time <- ifelse(labor$hours > 0, (labor$hours * 60 + labor$minutes),
+                        (labor$minutes))
+
+labor <- subset(labor,select = -c(hours,minutes))
+
+
+#the time it takes to weed is significantly different between SM and the other two treatments. There is no statistical difference between CM and BM. There is no crop interaction. For the future, just a note that the person weeding does significantly impact the result (at least with the two data points we have right now for each plot)
+time_by_trt <- ggplot(labor,aes(x=treatment, y=total.time, color = treatment)) + geom_boxplot() + xlab("Treatment") + ylab("Time (min)")
+time_by_trt
+
+anova <- aov(total.time ~ treatment, labor)
+summary(anova)
+
+tukey <- TukeyHSD(x=anova, "treatment", conf.level = 0.95)
+tukey
+
+#there's a better way to graph this, but I'm too lazy to go find it tonight
+time_by_date <- ggplot(labor,aes(x=treatment,y=total.time,color=treatment)) + facet_grid(~date_collected) + geom_boxplot()
+time_by_date
+
+
+```
+
+```{r yield initial visualizations}
+yield <- yield %>% subset(block != "5" & 
+                          date_collected != "3Aug2023" &
+                          block != "edge")
+
+yield$date_collected <- as.Date(yield$date_collected,format='%d%b%Y')
+
+yield$treatment <- as.factor(yield$treatment)
+yield$crop <- as.factor(yield$crop)
+
+#this was the quickest and dirtiest of visualizations and, among other things, I need to figure out how having DB split between east and west is impacting things. but, overall, what it does tell me is that treatment does not significantly impact yield
+yield_by_trt_AS <- ggplot(subset(yield,crop == "AS"),aes(x=treatment, y=total_yield_g, color = treatment)) + geom_boxplot() + xlab("Treatment") + ylab("Yield (g)")
+yield_by_trt_AS
+
+yield_by_trt <- ggplot(subset(yield,crop != "AS"),aes(x=treatment, y=total_yield_g, color = treatment)) + geom_boxplot() + facet_grid(~crop) + xlab("Treatment") + ylab("Yield (g)")
+yield_by_trt
+
+
+
+```
+
+```{r soil moisture live data}
+sm <- read.csv('2023_soil moisture_live.csv', header=TRUE)
+
+sm <- sm[-(1:5),]
+
+sm$Time <- as.POSIXct(sm$Time)
+
+sm <- sm %>% pivot_longer(cols = c('Bare.Soil', 'Cardboard.Mulch'),
+                    names_to = 'Treatment',
+                    values_to = 'soil.moisture')
+
+sm$soil.moisture <- gsub("%","",as.character(sm$soil.moisture))
+sm$soil.moisture <- as.numeric(sm$soil.moisture)
+
+
+sm$Treatment <- ifelse(sm$Treatment == "Bare.Soil", "No Mulch",
+                       "Cardboard Mulch")
+sm$Treatment <- as.factor(sm$Treatment)
+
+
+sm_line <- ggplot(sm, aes(x=Time, y = soil.moisture, color = Treatment)) + 
+                      geom_line() + 
+                ylab("Soil Moisture (%)") +
+                theme_bw() + 
+                theme_light() + 
+                theme(axis.title.y = element_text(vjust = 2),
+                      axis.text = element_text(size = 14),
+                      panel.grid.major.y = element_line(size = 0.5, color = "#f0f0f0"), 
+                      panel.grid.major.x = element_blank(), 
+                      panel.grid.minor.x = element_blank(), 
+                      axis.title.x = element_blank(),
+                      strip.background = element_rect(fill = "#787878")) +
+                scale_color_manual(values = c("#6A3D9A","#1B9E77"))
+sm_line
+
+temp <- fs::path(knitr::fig_path(),"soil_moisture.png")
+agg_png(temp, width = 7, height = 7, units = "in", res = 300)
+plot(sm_line)
+dev.off()
+knitr::include_graphics(temp)
+
+```
+
+```{r next steps}
+
+#today
+#open up Cece's poster and see what graphs she already has.
+#replicate if they're data I already have above
+#give feedback if not
+
+
+#for friday
+#have some version of each of these ready for friday, ideally with updated data
+#also create visuals for the soil moisture and soil temp data, definitely by the state fair
+
+```
