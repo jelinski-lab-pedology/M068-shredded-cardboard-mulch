@@ -1,0 +1,42 @@
+project:
+  type: book
+  # change output-dir to "docs" to publish to gh pages
+  output-dir: docs
+
+book:
+  title: "Shredded Cardboard Mulch"
+  author: "N.A. Jelinski, M.J Smith, N.B. Pearson"
+  date: "21-February-2024"
+  cover-image: ""
+  
+  chapters:
+    - index.qmd
+    - part: "Deliverables and Data Management"
+      chapters:
+      - deliverable1.qmd
+      # - deliverable2.qmd
+      # - deliverable3.qmd
+      # - deliverable4.qmd
+      # - datamanagementplan.qmd
+    - part: discussion-log-meeting-minutes.qmd
+      chapters:
+     #  - insert meeting minute qmd file names here!
+     
+    # - authorship-guidelines.qmd
+    # - summary.qmd
+    # - references.qmd
+  # appendices:
+    # - co-authorship-template.qmd
+    # - data-use-and-sharing.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme: cosmo
+  pdf:
+    documentclass: scrreprt
+
+editor: visual
+
+
