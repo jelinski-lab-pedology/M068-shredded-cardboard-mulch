@@ -1,3 +1,7 @@
+#Important note for SCM
+The e-book files for this project is currently stored in 03-support files - logs. This is somewhat of a temporary spot - feel free to move. As of 22FEB2024, Nic and Nora had not decided on a place that e-books would live.
+
+
 # MXXX-project-template
 This is a standardized repo template for jelinski lab new project repos which follows our lab-specific open science guide procedures [insert link here to guide]. 
 
@@ -164,7 +168,7 @@ This is arguably one of the most important features of your entire project. The 
     -   why was this project done; what was the motivation?
     -   how should I use these project files; what are the file formats, what programs do I need to run or access them; how were these files created and using what tools?
 
-A readme is a living document. You should begin any project with a draft readme, which, provided you use this workflow and file structure can be mostly copied from a suggested template located in this section. However, as your project grows and changes, your readme should be updated. Be as thorough as possible. Note that this is a project level readme. Although not required, you should strongly consider including sub readmes at within multipl subfolders where necessary. Conversely, you can create a project level book in Quarto that contains all readmes and documentation (see section X). *More information on how to use and write a readme in section X*.
+A readme is a living document. You should begin any project with a draft readme, which, provided you use this workflow and file structure can be mostly copied from a suggested template located in this section. However, as your project grows and changes, your readme should be updated. Be as thorough as possible. Note that this is a project level readme. Although not required, you should strongly consider including sub readmes at within multiple subfolders where necessary. Conversely, you can create a project level book in Quarto that contains all readmes and documentation (see section X). *More information on how to use and write a readme in section X*.
 
 #### A note on a TODO list. Do not keep a list of TODOs in a separate file. Instead log them as [*issues*](https://docs.github.com/en/issues/tracking-your-work-with-issues/about-issues) on GitHub. More powerful, more flexible. 
 

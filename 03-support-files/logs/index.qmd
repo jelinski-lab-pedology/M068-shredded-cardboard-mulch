@@ -1,6 +1,6 @@
 # Preface {.unnumbered}
 
-This quarto book documents the metadata architecture for "Implementing an Urban Soil Survey Framework in Minnesota" - USDA-NRCS Award #NR236322XXXXC008. This is a living, growing document intended to provide rich, accessible, and transparent documentation of project structure, deliverables, and data management. It will be continuously updated through the life of the project and will be assigned a persistent doi at the end of the project to provide long-term archiving and availability.
+This quarto book documents the metadata architecture for "Exploration of Shredded Cardboard...." - NCR-SARE Award #XXXX. This is a living, growing document intended to provide rich, accessible, and transparent documentation of project structure, deliverables, and data management. It will be continuously updated through the life of the project and will be assigned a persistent doi at the end of the project to provide long-term archiving and availability.
 
 ## Project Description
 
@@ -16,24 +16,24 @@ This document contains metadata for each of the grant deliverables, as well as g
 
 3\. *Technical assistance and resources*. We will provide technical assistance and training on geophysical tools and sample design to support onsite analysis. We will also develop resources to support site evaluation, monitoring, testing, or assessment in support of conservation activity plans.
 
-4\. *Engagement and outreach.* We will conduct series of community engagement, co-learning, and outreach opportunities.
-
 ## Key Personnel
 
 -   Nic Jelinski; Associate Professor, University of Minnesota (PI)
--   Joe Brennan; State Soil Scientist, NRCS
+-   Mary Rogers;  Associate Professor, University of Minnesota (PI)
+-   Morgan; Researcher, University of Minnesota
+-   Jennifer; PhD Candidate, University of Minnesota
 -   Nora Pearson; Researcher, University of Minnesota
--   Dan Wing; Senior Regional Soil Scientist, NRCS
--   Randy Riddle; Senior Soil Scientist for Urban Soil Survey, NRCS
--   Francine Lheritier; Natural Resource Soil Scientist, NRCS
--   Shaunna Repking; Soil Scientist, NRCS
--   Patty Burns; Soil Scientist, NRCS
+-   Melvin Giles; Co-Coordinator, UFGA
+-   Shari; Co-Coordinator, UFGA
+-   Stephanie Hankerson; Garden Educator
 
 ## Additional Collaborators
+- All 6 community gardens and their coordinators
+- Victoria, Dale St, Pilgrim Baptist (Nate), CSP (Metric Giles)
 
 ## Funding Source and RFP
 
-This project was funded by a cooperative agreement bewteen the USDA-NRCS and the University of Minnesota.
+This project was funded by a grant awarded to the University of Minnesota by NCR-SARE.
 
 ## Project Website
 

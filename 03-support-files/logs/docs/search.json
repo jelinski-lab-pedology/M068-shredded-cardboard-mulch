@@ -1,0 +1,51 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Shredded Cardboard Mulch",
+    "section": "",
+    "text": "Preface\nThis quarto book documents the metadata architecture for “Exploration of Shredded Cardboard….” - NCR-SARE Award #XXXX. This is a living, growing document intended to provide rich, accessible, and transparent documentation of project structure, deliverables, and data management. It will be continuously updated through the life of the project and will be assigned a persistent doi at the end of the project to provide long-term archiving and availability."
+  },
+  {
+    "objectID": "index.html#project-description",
+    "href": "index.html#project-description",
+    "title": "Shredded Cardboard Mulch",
+    "section": "Project Description",
+    "text": "Project Description\n[From Project Proposal] The purpose of this agreement, between the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and University of Minnesota (Recipient), is to harness existing collective resources, including non-NRCS research, data, specific expertise, and analytical capacity of soils in urban environments to complete a soil survey update. With much of the US population living in Urbanized Areas (UAs), there is a need for improved understanding of soil suitability’s, and limitations in these environments. Soil characterization information is needed in these areas as the resources are intensively managed, while current legacy soil survey products are largely out-of-date and provide limited use. Additionally, this agreement will promote the understanding the dynamic nature of soil properties in urban environments and expanding the use of new tools in support of urban agriculture."
+  },
+  {
+    "objectID": "index.html#structure-and-deliverables",
+    "href": "index.html#structure-and-deliverables",
+    "title": "Shredded Cardboard Mulch",
+    "section": "Structure and Deliverables",
+    "text": "Structure and Deliverables\nThis document contains metadata for each of the grant deliverables, as well as general project metadata and information. Each of the deliverables also has a unique GitHub repository nested under the tcma-urban-soil-mapping organization. These deliverables are:\n1. Updated Urban Soil Survey for Minneapolis/St. Paul/Bloomington MSA & DSP Investigation. We will harness existing collective resources, data, and analytical capacity, including non-NRCS research to complete a soil survey update for urban soils in the Minneapolis/St. Paul/Bloomington Metropolitan Statistical Area (MSA). We will design and execute a dynamic soil properties (DSP) investigation centered on urban agriculture.\n2. Documented mapping guide. We will document a mapping guide and conventions adaptable to project work in other census qualifying urbanized areas throughout the state of Minnesota.\n3. Technical assistance and resources. We will provide technical assistance and training on geophysical tools and sample design to support onsite analysis. We will also develop resources to support site evaluation, monitoring, testing, or assessment in support of conservation activity plans."
+  },
+  {
+    "objectID": "index.html#key-personnel",
+    "href": "index.html#key-personnel",
+    "title": "Shredded Cardboard Mulch",
+    "section": "Key Personnel",
+    "text": "Key Personnel\n\nNic Jelinski; Associate Professor, University of Minnesota (PI)\nMary Rogers; Associate Professor, University of Minnesota (PI)\nMorgan; Researcher, University of Minnesota\nJennifer; PhD Candidate, University of Minnesota\nNora Pearson; Researcher, University of Minnesota\nMelvin Giles; Co-Coordinator, UFGA\nShari; Co-Coordinator, UFGA\nStephanie Hankerson; Garden Educator"
+  },
+  {
+    "objectID": "index.html#additional-collaborators",
+    "href": "index.html#additional-collaborators",
+    "title": "Shredded Cardboard Mulch",
+    "section": "Additional Collaborators",
+    "text": "Additional Collaborators\n\nAll 6 community gardens and their coordinators\nVictoria, Dale St, Pilgrim Baptist (Nate), CSP (Metric Giles)"
+  },
+  {
+    "objectID": "index.html#funding-source-and-rfp",
+    "href": "index.html#funding-source-and-rfp",
+    "title": "Shredded Cardboard Mulch",
+    "section": "Funding Source and RFP",
+    "text": "Funding Source and RFP\nThis project was funded by a grant awarded to the University of Minnesota by NCR-SARE."
+  },
+  {
+    "objectID": "index.html#project-website",
+    "href": "index.html#project-website",
+    "title": "Shredded Cardboard Mulch",
+    "section": "Project Website",
+    "text": "Project Website\nhttps://github.com/tmca-urban-soil-mapping"
+  }
+]
