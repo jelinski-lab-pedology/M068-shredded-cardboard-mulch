@@ -16,13 +16,10 @@ book:
       - deliverable1.qmd
       - deliverable2.qmd
       - deliverable3.qmd
-      # - datamanagementplan.qmd
-   # - part: "Results"
-   #   chapters:
-    - part: discussion-log-meeting-minutes.qmd
+    - part: "Discussion Log and Meeting Minutes"
       chapters:
-     #  - insert meeting minute qmd file names here! create new qmd for each meeting and use same naming structure for all qmds
       - minutes-26JAN2024-check-in.qmd
+      - minutes-09FEB2024-check-in.qmd
      
     # - authorship-guidelines.qmd
     # - summary.qmd
