@@ -1,31 +1,37 @@
 # Preface {.unnumbered}
 
-This quarto book documents the metadata architecture for "Exploration of Shredded Cardboard...." - NCR-SARE Award #XXXX. This is a living, growing document intended to provide rich, accessible, and transparent documentation of project structure, deliverables, and data management. It will be continuously updated through the life of the project and will be assigned a persistent doi at the end of the project to provide long-term archiving and availability.
+This quarto book documents the metadata architecture for "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities" - NCR-SARE Award #XXXX. This is a living, growing document intended to provide rich, accessible, and transparent documentation of project structure, deliverables, and data management. It will be continuously updated through the life of the project and will be assigned a persistent doi at the end of the project to provide long-term archiving and availability.
 
-## Project Description
+## Project Summary
 
-\[From Project Proposal\] The purpose of this agreement, between the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and University of Minnesota (Recipient), is to harness existing collective resources, including non-NRCS research, data, specific expertise, and analytical capacity of soils in urban environments to complete a soil survey update. With much of the US population living in Urbanized Areas (UAs), there is a need for improved understanding of soil suitability's, and limitations in these environments. Soil characterization information is needed in these areas as the resources are intensively managed, while current legacy soil survey products are largely out-of-date and provide limited use. Additionally, this agreement will promote the understanding the dynamic nature of soil properties in urban environments and expanding the use of new tools in support of urban agriculture.
+\[From Project Proposal\] Problem Description: Mulching is utilized by urban growers to build soil health, mitigate weed pressure, and reduce water use. Despite these benefits, many mulching materials have become too expensive for growers to purchase and transport in the quantities required for an urban garden or farm. Our community-university research team identified shredded cardboard as a potential new mulch material that is accessible and affordable because of the increase in cardboard packaging for home delivery during the COVID-19 pandemic. The overall objective of this collaborative project is to assess the performance of shredded cardboard mulch in urban farms and gardens. 
+
+Key Outcomes: Researchers, extension educators, and urban growers will increase understanding about the efficacy of shredded cardboard mulch and its impact on plant health, water use, and soil fertility. Researchers/educators will leverage grower experiences to develop mulching guidance and education resources. Growers will implement mulching practices to increase yields while stewarding environmental resources, such as waater and soil nutrients. 
+
+Approach: Activities were designed collaboratively by the community-university research team and informed by feedback from twenty growers who participated in a pilot study of shredded cardboard mulch in summer 2021. Growers observed that while mulch reduced weed pressure and maintained soil moisture, crops were more susceptible to chlorosis (leaf yellowing). Thus, we will conduct replicated research trials at the University of Minnesota to compare the effects of shredded cardboard mulch, straw, and no mulch on yield; nitrogen cycling; and soil characteristics (Activity 1). Based on grower interest in conducting research and requests for support to implement mulching, irrigation, and fertility management practices, we will facilitate co-learning gatherings to build shared knowledge (Activity 2). Finally, we will connect shredded cardboard mulching practices to broader environmental justice and climate change adaptation efforts by establishing an industry advisory panel, conducting a literature review, and facilitating three tours per year to sites such as cardboard production, recycling, and composting facilities, garden networks, or community organizations addressing climate change (Activity 3). 
+
+Relevance: In comination with parallel projeccts to explore local production and distribution of shredded cardboard, this project will contribute to increasing the avaliabilty, affordability, and accessibility of a new mulching option, which would benefit small-scale growers throughout the North Central Region. 
 
 ## Structure and Deliverables
 
-This document contains metadata for each of the grant deliverables, as well as general project metadata and information. Each of the deliverables also has a unique GitHub repository nested under the tcma-urban-soil-mapping organization. These deliverables are:
+This document contains metadata for each of the grant deliverables, as well as general project metadata and information. Each of the deliverables also has a unique GitHub repository. These deliverables are:
 
-1\. *Updated Urban Soil Survey for Minneapolis/St. Paul/Bloomington MSA & DSP Investigation*. We will harness existing collective resources, data, and analytical capacity, including non-NRCS research to complete a soil survey update for urban soils in the Minneapolis/St. Paul/Bloomington Metropolitan Statistical Area (MSA). We will design and execute a dynamic soil properties (DSP) investigation centered on urban agriculture.
+1\. *Assess performance of shredded cardboard mulch in annual horticultural cropping systems*. We will conduct replicated research trials at the University of Minnesota to assess the effects of shredded cardboard mulch on yield; nitrogen cycling; and soil characteristics. 
 
-2\. *Documented mapping guide*. We will document a mapping guide and conventions adaptable to project work in other census qualifying urbanized areas throughout the state of Minnesota.
+2\. *Build shared knowledge of mulching and related practices with urban growers*. We will facilitate complementary grower trials with six community gardeners and facilitate co-learning gatherings to build shared knowledge.
 
-3\. *Technical assistance and resources*. We will provide technical assistance and training on geophysical tools and sample design to support onsite analysis. We will also develop resources to support site evaluation, monitoring, testing, or assessment in support of conservation activity plans.
+3\. *Connect on-farm practices to broader systems*. We will connect garden mulching practices to broader environmental justice and climate change efforts.
 
 ## Key Personnel
 
--   Nic Jelinski; Associate Professor, University of Minnesota (PI)
--   Mary Rogers;  Associate Professor, University of Minnesota (PI)
--   Morgan; Researcher, University of Minnesota
--   Jennifer; PhD Candidate, University of Minnesota
--   Nora Pearson; Researcher, University of Minnesota
--   Melvin Giles; Co-Coordinator, UFGA
--   Shari; Co-Coordinator, UFGA
--   Stephanie Hankerson; Garden Educator
+- Nic Jelinski; Associate Professor, University of Minnesota (PI)
+- Mary Rogers;  Associate Professor, University of Minnesota (PI)
+- Jennifer; PhD Candidate, University of Minnesota
+- Morgan Smith; Researcher, University of Minnesota
+- Nora Pearson; Researcher, University of Minnesota
+- Melvin Giles; Co-Coordinator, UFGA
+- Shari Cueto; Co-Coordinator, UFGA
+- Stephanie Hankerson; Garden Educator
 
 ## Additional Collaborators
 - All 6 community gardens and their coordinators

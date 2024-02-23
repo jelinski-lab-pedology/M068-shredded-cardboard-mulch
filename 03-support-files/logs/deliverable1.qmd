@@ -1,7 +1,8 @@
-# Metadata for Deliverable 1: research trials
+# Metadata for Deliverable 1: Assess performance of shredded cardboard mulch in annual horticultural cropping systems
 
 ## Approach
-Conduct field work on UMN St. Paul Campus to collect data.
+Two research questions will be investigated: 1a) what is the effect of shredded cardboard mulch on within-season crop productivity? and 1b) what is the effect of shredded cardboard on soil carbon and nitrogen dynamics? Research will be conducted at the UMN St. Paul campus and investigate three treatments: shredded cardboard mulch, standard straw-based mulch, and bare soil, hand-weeded control plot. Treatments will be applied to three annual crops: tomatoes, collard greens, and day-neutral strawberries in a randomized complete block design. We will host a field tour each year, with 15-20 attendees, as an opportunity for growers to see research plots and share feedback with researchers. 
 
 ## Deliverables
-Copy from grant language.
+To understand the efficacy of shredded cardboard mulch, UMN and grower trials will generate quantitative data for crop productivity, water use, and soil properties over two seasons. Combined with qualitative data from grower feedback, we will develop guidelines for shredded cardboard mulch use and corresponding educational materials. The graduate student will present at a relevant conference once per year (in collaboration with a grower or community partner, if mutually beneficial), and the research team will publish one article in an academic journal. 
+
