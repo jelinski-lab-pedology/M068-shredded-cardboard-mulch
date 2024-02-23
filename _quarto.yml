@@ -16,6 +16,9 @@ book:
       - deliverable1.qmd
       - deliverable2.qmd
       - deliverable3.qmd
+    - part: "Results"
+      chapters: 
+        - results-2023.qmd 
     - part: "Discussion Log and Meeting Minutes"
       chapters:
       - minutes-26JAN2024-check-in.qmd
