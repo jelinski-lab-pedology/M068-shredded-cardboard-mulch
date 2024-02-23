@@ -7,7 +7,7 @@ book:
   title: "Shredded Cardboard Mulch"
   author: "N.A. Jelinski, M.J Smith, N.B. Pearson"
   date: "21-February-2024"
-  cover-image: ""
+  cover-image: "cardboard-mulch-badge.png"
   
   chapters:
     - index.qmd
@@ -19,6 +19,9 @@ book:
     - part: "Results"
       chapters: 
         - results-2023.qmd 
+    - part: "More Information / Get Involved"
+      chapters:
+        - more-info-get-involved.qmd
     - part: "Discussion Log and Meeting Minutes"
       chapters:
       - minutes-26JAN2024-check-in.qmd
@@ -32,6 +35,8 @@ book:
     # - data-use-and-sharing.qmd
 
 bibliography: references.bib
+
+lightbox: true
 
 format:
   html:
