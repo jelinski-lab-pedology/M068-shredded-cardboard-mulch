@@ -1,5 +1,5 @@
 #Important note for SCM
-The e-book files for this project is currently stored in 03-support files - logs. This is somewhat of a temporary spot - feel free to move. As of 22FEB2024, Nic and Nora had not decided on a place that e-books would live.
+The e-book files for this project are all in the main repo folder.
 
 
 # MXXX-project-template
