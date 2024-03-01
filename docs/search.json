@@ -2,7 +2,7 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "Shredded Cardboard Mulch",
+    "title": "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities",
     "section": "",
     "text": "Preface\nThis quarto book documents the metadata architecture for “Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities” - NCR-SARE Award #XXXX. This is a living, growing document intended to provide rich, accessible, and transparent documentation of project structure, deliverables, and data management. It will be continuously updated through the life of the project and will be assigned a persistent doi at the end of the project to provide long-term archiving and availability.",
     "crumbs": [
@@ -12,7 +12,7 @@
   {
     "objectID": "index.html#project-summary",
     "href": "index.html#project-summary",
-    "title": "Shredded Cardboard Mulch",
+    "title": "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities",
     "section": "Project Summary",
     "text": "Project Summary\n[From Project Proposal] Problem Description: Mulching is utilized by urban growers to build soil health, mitigate weed pressure, and reduce water use. Despite these benefits, many mulching materials have become too expensive for growers to purchase and transport in the quantities required for an urban garden or farm. Our community-university research team identified shredded cardboard as a potential new mulch material that is accessible and affordable because of the increase in cardboard packaging for home delivery during the COVID-19 pandemic. The overall objective of this collaborative project is to assess the performance of shredded cardboard mulch in urban farms and gardens.\nKey Outcomes: Researchers, extension educators, and urban growers will increase understanding about the efficacy of shredded cardboard mulch and its impact on plant health, water use, and soil fertility. Researchers/educators will leverage grower experiences to develop mulching guidance and education resources. Growers will implement mulching practices to increase yields while stewarding environmental resources, such as waater and soil nutrients.\nApproach: Activities were designed collaboratively by the community-university research team and informed by feedback from twenty growers who participated in a pilot study of shredded cardboard mulch in summer 2021. Growers observed that while mulch reduced weed pressure and maintained soil moisture, crops were more susceptible to chlorosis (leaf yellowing). Thus, we will conduct replicated research trials at the University of Minnesota to compare the effects of shredded cardboard mulch, straw, and no mulch on yield; nitrogen cycling; and soil characteristics (Activity 1). Based on grower interest in conducting research and requests for support to implement mulching, irrigation, and fertility management practices, we will facilitate co-learning gatherings to build shared knowledge (Activity 2). Finally, we will connect shredded cardboard mulching practices to broader environmental justice and climate change adaptation efforts by establishing an industry advisory panel, conducting a literature review, and facilitating three tours per year to sites such as cardboard production, recycling, and composting facilities, garden networks, or community organizations addressing climate change (Activity 3).\nRelevance: In comination with parallel projeccts to explore local production and distribution of shredded cardboard, this project will contribute to increasing the avaliabilty, affordability, and accessibility of a new mulching option, which would benefit small-scale growers throughout the North Central Region.",
     "crumbs": [
@@ -22,7 +22,7 @@
   {
     "objectID": "index.html#structure-and-deliverables",
     "href": "index.html#structure-and-deliverables",
-    "title": "Shredded Cardboard Mulch",
+    "title": "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities",
     "section": "Structure and Deliverables",
     "text": "Structure and Deliverables\nThis document contains metadata for each of the grant deliverables, as well as general project metadata and information. Each of the deliverables also has a unique GitHub repository. These deliverables are:\n1. Assess performance of shredded cardboard mulch in annual horticultural cropping systems. We will conduct replicated research trials at the University of Minnesota to assess the effects of shredded cardboard mulch on yield; nitrogen cycling; and soil characteristics.\n2. Build shared knowledge of mulching and related practices with urban growers. We will facilitate complementary grower trials with six community gardeners and facilitate co-learning gatherings to build shared knowledge.\n3. Connect on-farm practices to broader systems. We will connect garden mulching practices to broader environmental justice and climate change efforts.",
     "crumbs": [
@@ -32,7 +32,7 @@
   {
     "objectID": "index.html#key-personnel",
     "href": "index.html#key-personnel",
-    "title": "Shredded Cardboard Mulch",
+    "title": "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities",
     "section": "Key Personnel",
     "text": "Key Personnel\n\nNic Jelinski; Associate Professor, University of Minnesota (PI)\nMary Rogers; Associate Professor, University of Minnesota (PI)\nJennifer Nicklay; PhD Candidate, University of Minnesota\nMorgan Smith; Researcher, University of Minnesota\nNora Pearson; Researcher, University of Minnesota\nMelvin Giles; Co-Coordinator, UFGA\nShari Cueto; Co-Coordinator, UFGA\nStephanie Hankerson; Garden Educator",
     "crumbs": [
@@ -42,7 +42,7 @@
   {
     "objectID": "index.html#additional-collaborators",
     "href": "index.html#additional-collaborators",
-    "title": "Shredded Cardboard Mulch",
+    "title": "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities",
     "section": "Additional Collaborators",
     "text": "Additional Collaborators\n\nAll 6 community gardens and their coordinators\nVictoria, Dale St, Pilgrim Baptist (Nate), CSP (Metric Giles)",
     "crumbs": [
@@ -52,7 +52,7 @@
   {
     "objectID": "index.html#funding-source-and-rfp",
     "href": "index.html#funding-source-and-rfp",
-    "title": "Shredded Cardboard Mulch",
+    "title": "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities",
     "section": "Funding Source and RFP",
     "text": "Funding Source and RFP\nThis project was funded by a grant awarded to the University of Minnesota by NCR-SARE.",
     "crumbs": [
@@ -62,7 +62,7 @@
   {
     "objectID": "index.html#project-website",
     "href": "index.html#project-website",
-    "title": "Shredded Cardboard Mulch",
+    "title": "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities",
     "section": "Project Website",
     "text": "Project Website\nhttps://nora-pearson.github.io/M068-shredded-cardboard-mulch/",
     "crumbs": [
@@ -199,193 +199,6 @@
     "crumbs": [
       "More Information / Get Involved",
       "<span class='chapter-number'>5</span>  <span class='chapter-title'>More Information - Get Involved</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html",
-    "href": "minutes-26JAN2024-check-in.html",
-    "title": "6  Check in 26JAN2024",
-    "section": "",
-    "text": "6.1 Attendees",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#attendees",
-    "href": "minutes-26JAN2024-check-in.html#attendees",
-    "title": "6  Check in 26JAN2024",
-    "section": "",
-    "text": "Nic Jelinski, University of Minnesota\nMary Rogers, University of Minnesota\nNora Pearson, University of Minnesota\nMorgan Smith, University of Minnesota\nJennifer Nicklay, University of Minnesota\nMelvin Giles, UFGA\nShari Cueto, UFGA\n\nStephanie Hankerson, UFGA",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#budget-update",
-    "href": "minutes-26JAN2024-check-in.html#budget-update",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.2 Budget Update",
-    "text": "6.2 Budget Update\n\nSupply budget was moved around in December to help cover Shari’s salary\nMore accurate picture of remaining budget will be available in June\nExpect to have enough funds for current plans with some extra cushion",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#intern-planning",
-    "href": "minutes-26JAN2024-check-in.html#intern-planning",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.3 Intern Planning",
-    "text": "6.3 Intern Planning\n\nLikely to have 1 SOAR REEU (Research and Extension Experiences for Undergraduates) intern\nSOAR intern may have some independent programming responsibilities\nEnthusiasm from Nic to have 1 AmeriCorps intern; community partners can determine number and responsibilities\nExploring option to hire Meira, a UFGA intern from last year; need to clarify details with Nic",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#data-situation",
-    "href": "minutes-26JAN2024-check-in.html#data-situation",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.4 Data Situation",
-    "text": "6.4 Data Situation\n\nAll data from last year entered; analysis has not begun\nCommunity garden beginning and end-of-season data available\nMorgan to start running lab tests soon; results in a couple months\nInitial data analysis deliverable by February 15\n\nCommunity partners requested plots/slides to share with industry partners",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#future-meetings",
-    "href": "minutes-26JAN2024-check-in.html#future-meetings",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.5 Future Meetings",
-    "text": "6.5 Future Meetings\n\nPlan to invite guest panelists to some meetings\n\nOrganic certifier in February\nUndergrad bioprocessing engineering students later",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#upcoming-tours-and-conferences",
-    "href": "minutes-26JAN2024-check-in.html#upcoming-tours-and-conferences",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.6 Upcoming Tours and Conferences",
-    "text": "6.6 Upcoming Tours and Conferences\n\nFebruary 1: Tour for Renewing the Countryside members\nWaiting to hear back about presenting at annual Urban Food Systems Symposium",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#supplies-for-2023-season",
-    "href": "minutes-26JAN2024-check-in.html#supplies-for-2023-season",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.7 Supplies for 2023 Season",
-    "text": "6.7 Supplies for 2023 Season\n\nOrdering seeds for greens that have resistance to pests affecting community gardens\nWill distribute seeds and transplants to gardeners\nPlanning to use student organic farm greenhouse for some transplant propagation\nFor field trials, considering switching beans from dragon tongue to standard bush beans",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#website",
-    "href": "minutes-26JAN2024-check-in.html#website",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.8 Website",
-    "text": "6.8 Website\n\nDiscussed options for creating simple project website\n\nGitHub provides free hosting, allows collaborative editing, links to data\nCould start with landing page and build out chapters/pages as needed",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-26JAN2024-check-in.html#action-items",
-    "href": "minutes-26JAN2024-check-in.html#action-items",
-    "title": "6  Check in 26JAN2024",
-    "section": "6.9 Action Items",
-    "text": "6.9 Action Items\n\nNic to research budget for hiring undergraduate student wage\nNora/Morgan to analyze existing data and provide initial plots by February 15\nStephanie to share website documentation to help plan layout\nNora/Morgan to mock up sample website pages for feedback",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Check in 26JAN2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-09FEB2024-check-in.html",
-    "href": "minutes-09FEB2024-check-in.html",
-    "title": "7  Check in 09FEB2024",
-    "section": "",
-    "text": "7.1 Attendees",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Check in 09FEB2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-09FEB2024-check-in.html#attendees",
-    "href": "minutes-09FEB2024-check-in.html#attendees",
-    "title": "7  Check in 09FEB2024",
-    "section": "",
-    "text": "Nic Jelinski, University of Minnesota\nMary Rogers, University of Minnesota\nNora Pearson, University of Minnesota\nMorgan Smith, University of Minnesota\nJennifer Nicklay, University of Minnesota\nMelvin Giles, UFGA\nShari Cueto, UFGA\n\nStephanie Hankerson, UFGA\nCherry Flowers, Organic Certifier",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Check in 09FEB2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-09FEB2024-check-in.html#industry-panel-update",
-    "href": "minutes-09FEB2024-check-in.html#industry-panel-update",
-    "title": "7  Check in 09FEB2024",
-    "section": "8.1 Industry Panel Update",
-    "text": "8.1 Industry Panel Update\nCherry Flowers joins the meeting to provide insights on organic certification requirements related to cardboard mulch. Key points:\n\nCardboard is generally allowed for mulch under OMRI regulations as long as it’s not waxed, treated with fungicides, or contains prohibited substances\nThere are some limitations around glossy/colored inks\nRecycled cardboard specifications are unclear - does this refer to cardboard that has been previously recycled or cardboard that will be recycled after use as mulch?\nRecommends checking with specific organic certifier before using as policies differ slightly\n\nShared experience using burlap coffee bags as mulch - more durable than cardboard sheets\nShredded cardboard likely easier to apply than sheets around existing plants",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Check in 09FEB2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-09FEB2024-check-in.html#planning-shred-right-facility-tour",
-    "href": "minutes-09FEB2024-check-in.html#planning-shred-right-facility-tour",
-    "title": "7  Check in 09FEB2024",
-    "section": "8.2 Planning Shred Right Facility Tour",
-    "text": "8.2 Planning Shred Right Facility Tour\n\nTour scheduled for March 29th, 12:30-1:45pm\n\n10 passenger vans reserved to transport attendees\nRSVPs needed to finalize headcount\nPotential attendees include research team, Urban Farm and Garden Alliance members\nWill provide $500 honorarium to Shred Right",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Check in 09FEB2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-09FEB2024-check-in.html#partnering-with-biosystems-engineering-student-project",
-    "href": "minutes-09FEB2024-check-in.html#partnering-with-biosystems-engineering-student-project",
-    "title": "7  Check in 09FEB2024",
-    "section": "8.3 Partnering with BioSystems Engineering Student Project",
-    "text": "8.3 Partnering with BioSystems Engineering Student Project\n\nStudent group exploring production and sourcing questions related to cardboard mulch\nStudents will compile findings into presentation in April\nStudents have industry connections that may yield additional cardboard sources",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Check in 09FEB2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-09FEB2024-check-in.html#new-community-garden-site",
-    "href": "minutes-09FEB2024-check-in.html#new-community-garden-site",
-    "title": "7  Check in 09FEB2024",
-    "section": "8.4 New Community Garden Site",
-    "text": "8.4 New Community Garden Site\n\nBlack Youth Healing Art Center replacing Dale St / Neighborworks site\nVictoria site now managed by Shari\nMonitoring situation at Pilgrim Lutheran site which may need to be replaced due to extensive construction activity",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Check in 09FEB2024</span>"
-    ]
-  },
-  {
-    "objectID": "minutes-09FEB2024-check-in.html#checking-in-on-fairshare-gardens-participation",
-    "href": "minutes-09FEB2024-check-in.html#checking-in-on-fairshare-gardens-participation",
-    "title": "7  Check in 09FEB2024",
-    "section": "8.5 Checking in on FairShare Gardens Participation",
-    "text": "8.5 Checking in on FairShare Gardens Participation\n\nMeeting March 20th to discuss financial relationship\nKey coordinators stepping back, opportunity to recruit new leadership\nCould hold spring kickoff event in April/May",
-    "crumbs": [
-      "Discussion Log and Meeting Minutes",
-      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Check in 09FEB2024</span>"
     ]
   }
 ]

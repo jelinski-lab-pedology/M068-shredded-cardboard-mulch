@@ -4,7 +4,7 @@ project:
   output-dir: docs
 
 book:
-  title: "Shredded Cardboard Mulch"
+  title: "Exploration of Shredded Cardboard as a Mulch and Compost Resource to Improve Soil Health and Water Management by Urban Growers in the Twin Cities"
   author: "N.A. Jelinski, M.J Smith, N.B. Pearson"
   date: "21-February-2024"
   cover-image: "cardboard-mulch-badge.png"
@@ -22,10 +22,6 @@ book:
     - part: "More Information / Get Involved"
       chapters:
         - more-info-get-involved.qmd
-    - part: "Discussion Log and Meeting Minutes"
-      chapters:
-      - minutes-26JAN2024-check-in.qmd
-      - minutes-09FEB2024-check-in.qmd
      
     # - authorship-guidelines.qmd
     # - summary.qmd
