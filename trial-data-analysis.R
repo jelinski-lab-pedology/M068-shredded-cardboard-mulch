@@ -7,7 +7,7 @@ library(tidyverse)
 
 
 # this is to read in the dataframe
-weed_time = read.csv(here::here("00-data", "a-raw", "scm_weeding_labor.csv"))
+weed_time = read.csv(here::here("00-data", "b-prepared", "20230814_SCM-Weeding Labor-UMN.csv"))
 str(weed_time)
 
 # split the time between hours and minutes into different columns
@@ -58,8 +58,10 @@ ggplot(wt_agg, aes(x = date, y = total_minutes, color = treatment)) +
   )+
   scale_x_date(date_labels = "%b", date_breaks = "3 weeks")
 
+# now calculate cumulative weeding time
+wt_plot_cum = aggregate(weed_time$total_minutes, list(weed_time$block, weed_time$treatment, weed_time$crop), FUN = sum)
 
-
+boxplot(wt_plot_cum$x ~ wt_plot_cum$Group.2, col = c("brown", "forestgreen", "goldenrod"), xlab = "Mulch Treatment", ylab = "Total Time Spent Weeding (minutes)", main = "Total Time Spent Weeding by Mulch Treatment", ylim = c(0,150))
 
 ###### NOW DOING MOISTURE USING SAME STEPS FROM ABOVE
 vwc = read.csv(here::here("00-data", "a-raw", "umn_scm_soilmoisture.csv"))
@@ -233,3 +235,62 @@ ggplot(yield_agg, aes(x = date, y = marketable_yield, color = treatment)) +
                "CM" = "forestgreen",
                "SM" = "goldenrod")
   )
+
+##### Now soil parameters
+soil = read.csv(here::here("00-data", "b-prepared", "SCM-soil-data.csv"))
+str(soil)
+
+# side-by-side boxplot of NO3 by treatment and date - here i want a grouped boxplot where dates are separated out
+
+ggplot(soil, aes(x = Treatment, y = NO3_ppm, fill = Sample_Date)) +
+  geom_boxplot() +
+  labs(
+    x = "Treatment",
+    y = "NO3 (ppm)",
+    fill = "Sample_Date"
+  )
+
+soil_mid_late <- soil[soil$Sample_Date != "23May2023", ]
+
+ggplot(soil_mid_late, aes(x = Treatment, y = NO3_ppm, fill = Sample_Date)) +
+  geom_boxplot() +
+  labs(
+    x = "Treatment",
+    y = "NO3 (ppm)",
+    fill = "Sample_Date"
+  )
+
+# anova for treatment differences bby date
+no3_anova <- aov(NO3_ppm ~ Treatment * Sample_Date, data = soil)
+summary(no3_anova)
+
+# posthoc test Tukey's
+TukeyHSD(no3_anova)
+
+# anova for treatment differences bby date
+nh4_anova <- aov(NH4_ppm ~ Treatment * Sample_Date, data = soil)
+summary(nh4_anova)
+
+# posthoc test Tukey's
+TukeyHSD(nh4_anova)
+
+soil_02oct = soil[soil$Sample_Date == "02Oct2023", ]
+
+ggplot(soil_02oct, aes(x = Treatment, y = NO3_ppm)) +
+  geom_boxplot() +
+  labs(
+    x = "Treatment",
+    y = "NO3 (ppm)"
+  )
+
+no3_anova_02oct <- aov(NO3_ppm ~ Treatment, data = soil_02oct)
+summary(no3_anova_02oct)
+
+# posthoc test Tukey's
+TukeyHSD(no3_anova_02oct)
+
+q: how do i remove all rows with value of "23May2023" in Sample_Date?
+  
+a: soil <- soil[soil$Sample_Date != "23May2023", ]
+
+NO3_agg = aggregate(soil$NO3_mgkg, list(soil$Sample_Date, soil$treatment), FUN = mean)
