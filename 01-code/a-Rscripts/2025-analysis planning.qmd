@@ -1,0 +1,92 @@
+---
+title: "Analysis planning"
+author: "Jennifer Nicklay"
+---
+
+# Analyses performed in literature
+
+## Read, 2013 (master's thesis)
+
+### Relevant weather station data (for visualization):
+
+-   average weekly temperature during the growing season
+
+    -   maybe split out daily high and low
+
+    -   compare to 30-yr (or other) normal
+
+-   average weekly precipitation over the growing season
+
+    -   compare to 30-yr (or other) normal
+
+### Analyses
+
+Read (2013) did the analysis in a different program, but I'm pretty sure they were doing mixed effects models.
+
+to do - I should go back to that mixed effects model agronomy blog post and book and see how they handled the block design as a random effect
+
+#### Response variable: yield
+
+Note that I can't do analysis by week, since the harvest strategy was different between the two years
+
+-   visualization: harvest biomass (total and marketable) by week for each year
+
+-   total biomass \~ treatment (for each crop), with year as random effect
+
+-   marketable biomass \~ treatment (for each crop), with year as random effect
+
+#### Response variable: weed biomass
+
+-   weekly biomass \~ treatment\*crop, week (or maybe just sampling #?) as random effect
+
+-   total biomass \~ treatment \* crop, year as random effect
+
+#### Response variable: weeding labor hours
+
+-   covert to \$
+
+-   labor by week \~ treatment\*crop, week (or maybe just sampling #?) as random effect
+
+-   total labor \~ treatment\*crop, year as random effect
+
+#### Response variable: soil temperature
+
+-   visualization: soil temp by week, for each year, with average, min, max, and flux displayed
+
+-   avg. soil temp \~ treatment\*crop, week as random effect
+
+-   weekly avg. for max soil temp \~ treatment\*crop, week as random effect
+
+-   weekly avg. for minimum soil temp \~ treatment\*crop, week as random effect
+
+-   weekly avg. temp flux, \~ treatment\*crop, week as random effect
+
+-   avg. soil temp \~ treatment\*crop, year as random effect
+
+-   avg. max soil temp \~ treatment\*crop, year as random effect
+
+-   avg. minimum soil temp \~ treatment\*crop, year as random effect
+
+-   avg. temp flux \~ treatment\*crop, year as random effect
+
+#### Response variable: soil moisture
+
+-   soil moisture \~ treatment\*crop, week as random effect
+
+-   average soil moisture \~ treatment\*crop, year as random effect
+
+-   visualization: soil moisture by week displayed with irrigation and precipitation
+
+# Idea holding area
+
+pH - check whether it's different between years and treatments
+
+SPAD - not sure what analysis to use this in
+
+irrigation - not sure how to visualize this
+
+not sure how to set up a stats analysis for yield \~ treatment\*soil N, for example, or if two-way and three-way ANOVAs are even desirable
+
+#### Response variable: soil N
+
+#### Response variable: soil C
