@@ -43,7 +43,7 @@ Note that I can't do analysis by week, since the harvest strategy was different 
 
 #### Response variable: weeding labor hours
 
--   covert to \$
+-   convert to \$
 
 -   labor by week \~ treatment\*crop, week (or maybe just sampling #?) as random effect
 

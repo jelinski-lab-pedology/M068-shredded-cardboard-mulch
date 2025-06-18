@@ -1,0 +1,81 @@
+---
+title: "Crop productivity analysis"
+---
+
+## Packages
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(here)
+
+```
+
+## Loading Data
+```{r}
+yield <- read.csv(here::here("00-data", "b-prepared", 
+                             "20250530_SCM-yield.csv"), 
+                      header = TRUE)
+
+spad <- read.csv(here::here("00-data", "b-prepared", 
+                            "20250530_SCM-SPAD.csv"), 
+                     header = TRUE)
+
+```
+
+## Format Data
+
+```{r}
+#separate edge data
+```
+
+
+## Yield
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```
+
+## Foliar Chlorophyll
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```

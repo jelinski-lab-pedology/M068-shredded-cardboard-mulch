@@ -1,0 +1,81 @@
+---
+title: "Weed Biomass and Labor"
+---
+
+## Packages
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(here)
+
+```
+
+## Loading Data
+```{r}
+weed_biomass <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250530_SCM-weed biomass.csv"), 
+                      header = TRUE)
+
+weed_labor <- read.csv(here::here("00-data", "b-prepared", 
+                                  "20250530_SCM-weed labor.csv"), 
+                     header = TRUE)
+
+```
+
+## Format Data
+
+```{r}
+
+```
+
+
+## Weed Biomass
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```
+
+## Soil Temperature
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```

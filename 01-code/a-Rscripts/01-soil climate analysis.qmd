@@ -1,0 +1,302 @@
+---
+title: "Soil climate analysis"
+author: "Jennifer Nicklay"
+---
+
+## Packages
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(here)
+library(weathermetrics)
+
+```
+
+## Loading Data
+```{r}
+soil_temp <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250530_SCM-soil-temp.csv"), 
+                      header = TRUE)
+
+soil_vwc <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250530_SCM-soil-moisture.csv"), 
+                     header = TRUE)
+
+soil_vwc_rt <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250530_SCM-real time moisture-2023.csv"), 
+                        header = TRUE)
+
+irrigation <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250530_SCM-irrigation.csv"), header = TRUE)
+
+temp_precip <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250407_temp and precip.csv"), header = TRUE)
+```
+
+## Format Data
+
+### Soil temperature
+```{r}
+
+soil_temp <- soil_temp %>%
+             dplyr::select('ID', 'block','plot', 'treatment', 
+                           'crop', 'date.time', 'temp_C') %>%
+             mutate_at(c('ID', 'block', 'plot', 'treatment', 'crop'), as.factor) %>%
+             mutate(date.time = lubridate::as_datetime(date.time, 
+                                                       format = "%m/%d/%Y %H:%M:%S")) %>%
+             mutate(date = lubridate::date(date.time)) %>%
+             mutate(year = lubridate::isoyear(ymd_hms(date.time))) %>%
+             mutate(week = lubridate::isoweek(ymd_hms(date.time))) %>%
+             mutate(month = lubridate::month(date.time)) %>%
+             mutate(study_yr = ifelse(year == "2023",1,
+                                ifelse(year == "2024" & month < 5,1,
+                                 2)))
+
+soil_temp_day <- soil_temp %>%
+                 group_by(ID, block, plot, treatment, crop, year, study_yr, month, week, date) %>%
+                 summarize(day_max = max(temp_C, na.rm = TRUE),
+                           day_min = min(temp_C, na.rm = TRUE),
+                           day_avg = (day_max + day_min)/2) %>%
+                 ungroup() 
+
+soil_temp_trt <- soil_temp_day %>%
+                 group_by(treatment, year, week, month, study_yr, date) %>%
+                 summarize(trt_avg_max = mean(day_max, na.rm = TRUE),
+                           trt_avg_min = mean(day_min, na.rm = TRUE),
+                           trt_avg = (trt_avg_max + trt_avg_min)/2) %>%
+                 ungroup()
+
+# ALERT: there's a weird quirk in the first and last days of the year, where they are part of the week from a different year. So that's worth checking, either to see if there's a better function or to just remove those weirdo dates from the calculation
+soil_temp_wk <- soil_temp_day %>%
+                group_by(treatment, year, study_yr, week) %>%
+                summarize(wk_avg_max = mean(day_max, na.rm = TRUE),
+                          wk_avg_min = mean(day_min, na.rm = TRUE),
+                          wk_avg = (wk_avg_max + wk_avg_min) /2) %>%
+                ungroup()
+
+soil_temp_month <- soil_temp_day %>%
+                   group_by(treatment, year, study_yr, month) %>%
+                   summarize(mon_avg_max = mean(day_max, na.rm = TRUE),
+                             mon_avg_min = mean(day_min, na.rm = TRUE),
+                             mon_avg = (mon_avg_max + mon_avg_min) / 2) %>%
+                   ungroup()
+
+soil_temp_season <- soil_temp_day %>%
+                    subset(month > 4 & month < 11) %>%
+                    group_by(treatment, year, study_yr) %>%
+                    summarize(season_avg_max = mean(day_max, na.rm = TRUE),
+                              season_avg_min = mean(day_min, na.rm = TRUE),
+                              season_avg = (season_avg_max + season_avg_min) / 2) %>%
+                    ungroup()
+```
+### Air temperature and precipitation
+```{r}
+
+#check with Nic to see if changing trace precip to 0.001 in was appropriate
+temp_precip_day <- temp_precip %>%
+                   rename(max_temp_F = Maximum.Temperature.degrees..F.,
+                          min_temp_F = Minimum.Temperature.degrees..F.,
+                          precip_in = Precipitation..inches.,
+                          date = Date) %>%
+                   mutate(date = lubridate::as_date(date, format = "%Y-%m-%d"),
+                          year = as.numeric(lubridate::year(date))) %>%
+                   mutate(month = lubridate::month(date),
+                          week = lubridate::isoweek(ymd(date)), 
+                          precip_in = ifelse(precip_in == "T", 0.001, precip_in)) %>%
+                   subset(year == "2023" | year == "2024" | (year == "2025" & month < 5)) %>%
+                   mutate_at(c('max_temp_F', 'min_temp_F','precip_in'), as.numeric) %>%
+                   mutate(max_temp_C = fahrenheit.to.celsius(max_temp_F, round = 2),
+                          min_temp_C = fahrenheit.to.celsius(min_temp_F, round = 2),
+                          precip_mm = convert_precip(precip_in, old_metric = "inches", new_metric = "mm", round = 2),
+                          avg_temp_C = (max_temp_C + min_temp_C)/2) %>%
+                   dplyr::select('date', 'year', 'month', 'week', 'max_temp_C', 'min_temp_C', 'avg_temp_C', 'precip_mm') 
+
+# ALERT: there's a weird quirk in the first and last days of the year, where they are part of the week from a different year. So that's worth checking, either to see if there's a better function or to just remove those weirdo dates from the calculation  
+temp_precip_wk <- temp_precip_day %>%
+                  group_by(year, month, week) %>%
+                  summarize(wk_precip_in = sum(precip_mm),
+                            wk_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                            wk_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                            wk_avg_temp_C = (wk_avg_temp_max + wk_avg_temp_min) /2) %>%
+                  ungroup()
+
+
+temp_precip_mon <- temp_precip_day %>%
+                   group_by(year, month) %>%
+                   summarize(mon_precip_in = sum(precip_mm),
+                             mon_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                             mon_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                             mon_avg_temp_C = (mon_avg_temp_max + mon_avg_temp_min) / 2) %>%
+                   ungroup()
+
+temp_precip_season <- temp_precip_day %>%
+                      subset(month > 4 & month < 11) %>%
+                      group_by(year) %>%
+                      summarize(season_precip_in = sum(precip_mm),
+                                season_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                                season_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                                season_avg_temp_C = (season_avg_temp_max + season_avg_temp_min) / 2) %>%
+                    ungroup()
+
+temp_precip_yr <- temp_precip_day %>%
+                    group_by(year) %>%
+                    summarize(yr_precip_in = sum(precip_mm),
+                              yr_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                              yr_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                              yr_avg_temp_C = (yr_avg_temp_max + yr_avg_temp_min) / 2) %>%
+                    ungroup()
+```
+
+
+```{r}
+soil_vwc <- soil_vwc %>%
+            dplyr::select('sample_date', 'block','plot', 'treatment', 'crop', 
+                          'bed_location', 'vwc_percent', 'period', 'EC')  %>%
+            mutate(sample_date = lubridate::as_date(sample_date, 
+                                                    format = "%m/%d/%Y")) %>%
+            mutate(year = lubridate::isoyear(ymd(sample_date))) %>%
+            mutate(month = lubridate::month(sample_date)) %>%
+            mutate_at(c('block', 'plot', 'treatment', 'crop', 'bed_location'), 
+                      as.factor)
+
+soil_vwc_rt <- soil_vwc_rt %>%
+               mutate(date.time = lubridate::as_datetime(date.time,
+                                                         format = "%m/%d/%Y %H:%M")) %>%
+               mutate(date = lubridate::date(date.time)) %>%
+               mutate(month = lubridate::month(date.time)) %>%
+               rename(BM = bare.soil,
+                      CM = cardboard.mulch) %>%
+               pivot_longer(cols = c('BM', 'CM'),
+                            names_to = 'treatment',
+                            values_to = "vwc_percent") %>%
+               mutate(vwc_percent = as.numeric(gsub('%', '', vwc_percent))) %>%
+               drop_na(vwc_percent) %>%
+               subset(date != "2023-10-04") %>%
+               mutate_at('treatment' ,as.factor)
+
+#need flow rate to convert to volume
+irrigation <- irrigation %>%
+              mutate(date = lubridate::as_date(date, format = "%m/%d/%Y")) %>%
+              dplyr::select('date','total_time_hr')
+
+```
+
+
+
+## Irrigation and Precipitation
+
+### Visualization
+```{r}
+
+
+```
+
+## Soil Moisture
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```
+
+## Soil Temperature
+
+### Visualization
+
+The three graphs below show the average daily temp, with each temp probe assigned a different color. It demonstrates that we have total coverage with at least one temp probe per treatment at all times. These graphs will not be in the publication
+```{r}
+
+ggplot(subset(soil_temp_day, treatment == "BM"), aes(x = date, y = day_avg, color = ID)) + geom_point() 
+
+ggplot(subset(soil_temp_day, treatment == "CM"), aes(x = date, y = day_avg, color = ID)) + geom_point() 
+
+ggplot(subset(soil_temp_day, treatment == "SM"), aes(x = date, y = day_avg, color = ID)) + geom_point() 
+
+```
+Following differences in average air temp, soil temperature was higher in 2023 compared to 2024, particularly in July and August (Table X, Figure X)
+
+```{r}
+# Make a table for this data
+
+subset(soil_temp_month, month > 5 & month < 11)
+
+```
+
+Both cardboard mulch and straw mulch have a similarly moderating effect on average daily soil temperature. When the daily average air temperature in July 2023 and 2024 was 22C, for example, the soil temperature in mulched treatments remained several degrees cooler than the bare soil treatment; this trend was also apparent in March and April 2024, when bare soil warmed up faster than the mulched treatments. Conversely, when the air temperature dropped in October 2023, the soil temperature in mulched treatments remained slightly warmer than bare soil. 
+
+```{r}
+# Graphing the treatment average maximum daily soil temp perhaps shows the trends for bare soil a little more, but not so much that it's worth having an extra figure. 
+#What to do with the straw mulch in 2024?
+
+# add note symbol for when mulch was applied, or make it show only after mulch is applied.
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt, year == "2023" & 
+                                    month > 4 & 
+                                    month < 11), 
+       aes(x = date, 
+           y = trt_avg, 
+           color = treatment)) +
+  geom_line(data = subset(temp_precip_day, year == "2023" & 
+                                    month > 4 & 
+                                    month < 11), 
+            aes(x = date, 
+                y = avg_temp_C)) +
+  theme_bw()
+
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt, year == "2024" & 
+                                    month > 4 & 
+                                    month < 11), 
+       aes(x = date, 
+           y = trt_avg, 
+           color = treatment)) +
+  geom_line(data = subset(temp_precip_day, year == "2024" & 
+                                    month > 4 & 
+                                    month < 11), 
+            aes(x = date, 
+                y = avg_temp_C)) +
+  theme_bw()
+
+```
+
+
+While our study focused on the growing season between May and October, this trend was consistent over winter and in the spring, prior to mulch removal and planting.
+
+```{r}
+# I need to change the aesthetics so that the air temperature is a dashed, gray line
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt, study_yr == 1), aes(x = date, y = trt_avg, color = treatment)) +
+  geom_line(data = subset(temp_precip_day, (year == "2023" & month > 4) | (year == "2024" & month < 5)), 
+            aes(x = date, y = avg_temp_C)) +
+  theme_bw()
+
+ggplot() +
+  geom_line(data = subset(soil_temp_trt, study_yr == 2), aes(x = date, y = trt_avg, color = treatment)) + 
+  geom_line(data = subset(temp_precip_day, (year == "2024" & month > 4) | (year == "2025" & month < 5)), 
+            aes(x = date, y = avg_temp_C)) +
+  theme_bw()
+
+```
+
+
+
+

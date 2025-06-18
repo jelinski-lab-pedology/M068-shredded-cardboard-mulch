@@ -1,0 +1,262 @@
+---
+title: "Soil fertility"
+---
+
+## Packages
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(here)
+
+```
+
+## Loading Data
+```{r}
+#will also need to add in 
+soil_fert <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250530_SCM-soil-fertility.csv"), 
+                           header = TRUE)
+
+bd <- read.csv(here::here("00-data", "b-prepared", 
+                          "20250530_SCM-BD.csv"), 
+                     header = TRUE)
+
+```
+
+## Format Data
+
+```{r}
+
+```
+
+## Initial Soil Properties
+
+```{r}
+
+
+```
+
+## Phosphorus
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```
+
+## Potassium
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```
+
+
+## Carbon
+
+### Total Carbon
+
+#### Visualization
+
+```{r}
+
+
+```
+
+#### Normality
+```{r}
+
+```
+
+#### ANOVA
+```{r}
+
+```
+
+#### Linear Mixed Model
+```{r}
+
+```
+
+### Bulk Density
+
+#### Visualization
+
+```{r}
+
+
+```
+
+#### Normality
+```{r}
+
+```
+
+#### ANOVA
+```{r}
+
+```
+
+#### Linear Mixed Model
+```{r}
+
+```
+
+## Nitrogen
+
+### Nitrate
+
+#### Visualization
+
+```{r}
+
+
+```
+
+#### Normality
+```{r}
+
+```
+
+#### ANOVA
+```{r}
+
+```
+
+#### Linear Mixed Model
+```{r}
+
+```
+
+### Ammonium
+
+#### Visualization
+
+```{r}
+
+
+```
+
+#### Normality
+```{r}
+
+```
+
+#### ANOVA
+```{r}
+
+```
+
+#### Linear Mixed Model
+```{r}
+
+```
+
+### Total Nitrogen
+
+#### Visualization
+
+```{r}
+
+
+```
+
+#### Normality
+```{r}
+
+```
+
+#### ANOVA
+```{r}
+
+```
+
+#### Linear Mixed Model
+```{r}
+
+```
+
+### ACE
+
+#### Visualization
+
+```{r}
+
+
+```
+
+#### Normality
+```{r}
+
+```
+
+#### ANOVA
+```{r}
+
+```
+
+#### Linear Mixed Model
+```{r}
+
+```
+
+
+## C:N Ratio
+
+### Visualization
+
+```{r}
+
+
+```
+
+### Normality
+```{r}
+
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+```{r}
+
+```
