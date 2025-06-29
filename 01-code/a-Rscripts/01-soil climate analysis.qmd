@@ -11,7 +11,11 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(here)
-library(weathermetrics)
+library(weathermetrics) #specifically for the temp units conversion
+library(MASS) #boxcox transformation
+library(lme4)         #mixed models
+library(lmerTest)     #mixed models
+library(broom.mixed)  #mixed models
 
 ```
 
@@ -29,11 +33,11 @@ soil_vwc_rt <- read.csv(here::here("00-data", "b-prepared",
                                  "20250530_SCM-real time moisture-2023.csv"), 
                         header = TRUE)
 
-irrigation <- read.csv(here::here("00-data", "b-prepared", 
-                                 "20250530_SCM-irrigation.csv"), header = TRUE)
+drip_irrigation <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250618_SCM-irrigation.csv"), header = TRUE)
 
 temp_precip <- read.csv(here::here("00-data", "b-prepared", 
-                                 "20250407_temp and precip.csv"), header = TRUE)
+                                 "20250618_temp and precip.csv"), header = TRUE)
 ```
 
 ## Format Data
@@ -92,7 +96,7 @@ soil_temp_season <- soil_temp_day %>%
                               season_avg = (season_avg_max + season_avg_min) / 2) %>%
                     ungroup()
 ```
-### Air temperature and precipitation
+### Air temperature 
 ```{r}
 
 #check with Nic to see if changing trace precip to 0.001 in was appropriate
@@ -112,55 +116,94 @@ temp_precip_day <- temp_precip %>%
                           min_temp_C = fahrenheit.to.celsius(min_temp_F, round = 2),
                           precip_mm = convert_precip(precip_in, old_metric = "inches", new_metric = "mm", round = 2),
                           avg_temp_C = (max_temp_C + min_temp_C)/2) %>%
-                   dplyr::select('date', 'year', 'month', 'week', 'max_temp_C', 'min_temp_C', 'avg_temp_C', 'precip_mm') 
+                   dplyr::select('date', 'year', 'month', 'week', 'max_temp_C', 'min_temp_C', 'avg_temp_C','precip_in', 'precip_mm') 
 
 # ALERT: there's a weird quirk in the first and last days of the year, where they are part of the week from a different year. So that's worth checking, either to see if there's a better function or to just remove those weirdo dates from the calculation  
-temp_precip_wk <- temp_precip_day %>%
-                  group_by(year, month, week) %>%
-                  summarize(wk_precip_in = sum(precip_mm),
-                            wk_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
-                            wk_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
-                            wk_avg_temp_C = (wk_avg_temp_max + wk_avg_temp_min) /2) %>%
+temp_wk <- temp_precip_day %>%
+           group_by(year, month, week) %>%
+           summarize(wk_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                     wk_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                     wk_avg_temp_C = (wk_avg_temp_max + wk_avg_temp_min) /2) %>%
+           ungroup()
+
+
+temp_mon <- temp_precip_day %>%
+            group_by(year, month) %>%
+            summarize(mon_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                      mon_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                      mon_avg_temp_C = (mon_avg_temp_max + mon_avg_temp_min) / 2) %>%
+            ungroup()
+
+temp_season <- temp_precip_day %>%
+               subset(month > 4 & month < 11) %>%
+               group_by(year) %>%
+               summarize(season_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                         season_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                         season_avg_temp_C = (season_avg_temp_max + season_avg_temp_min) / 2) %>%
+               ungroup()
+
+temp_yr <- temp_precip_day %>%
+           group_by(year) %>%
+           summarize(yr_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
+                     yr_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
+                     yr_avg_temp_C = (yr_avg_temp_max + yr_avg_temp_min) / 2) %>%
+           ungroup()
+```
+### Irrigation and Precipitation
+
+```{r}
+drip_irrigation <- drip_irrigation %>%
+                   mutate(date = lubridate::as_date(date, format = "%m/%d/%Y"),
+                          year = lubridate::isoyear(ymd(date)), 
+                          month = lubridate::month(date),
+                          week = lubridate::isoweek(ymd(date)),
+                          type = "drip") %>%
+                   dplyr::select('date', 'year', 'month', 'week', 'type', 'irrigation_in')
+
+irrigation_day <- temp_precip_day %>%
+                  mutate(type = "precip") %>%
+                  rename(irrigation_in = precip_in) %>%
+                  dplyr::select('date','year','month','week','type','irrigation_in') %>%
+                  rbind(drip_irrigation)
+
+irrigation_wk <- irrigation_day %>%
+                 group_by(year, month, week, type) %>%
+                 summarize(irrigation_in = sum(irrigation_in)) %>%
+                 ungroup()
+
+irrigation_mon <- irrigation_day %>%
+                  group_by(year, month, type) %>%
+                  summarize(irrigation_in = sum(irrigation_in)) %>%
                   ungroup()
 
+irrigation_season <- irrigation_day %>%
+                     subset(month > 4 & month < 11) %>%
+                     group_by(year, type) %>%
+                     summarize(irrigation_in = sum(irrigation_in)) %>%
+                     ungroup()
 
-temp_precip_mon <- temp_precip_day %>%
-                   group_by(year, month) %>%
-                   summarize(mon_precip_in = sum(precip_mm),
-                             mon_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
-                             mon_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
-                             mon_avg_temp_C = (mon_avg_temp_max + mon_avg_temp_min) / 2) %>%
-                   ungroup()
+irrigation_yr <- irrigation_day %>%
+                 group_by(year, type) %>%
+                 summarize(irrigation_in = sum(irrigation_in)) %>%
+                 ungroup()
 
-temp_precip_season <- temp_precip_day %>%
-                      subset(month > 4 & month < 11) %>%
-                      group_by(year) %>%
-                      summarize(season_precip_in = sum(precip_mm),
-                                season_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
-                                season_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
-                                season_avg_temp_C = (season_avg_temp_max + season_avg_temp_min) / 2) %>%
-                    ungroup()
-
-temp_precip_yr <- temp_precip_day %>%
-                    group_by(year) %>%
-                    summarize(yr_precip_in = sum(precip_mm),
-                              yr_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
-                              yr_avg_temp_min = mean(min_temp_C, na.rm = TRUE),
-                              yr_avg_temp_C = (yr_avg_temp_max + yr_avg_temp_min) / 2) %>%
-                    ungroup()
 ```
 
 
+### Soil Moisture
 ```{r}
 soil_vwc <- soil_vwc %>%
+            subset(block != "5") %>%
             dplyr::select('sample_date', 'block','plot', 'treatment', 'crop', 
                           'bed_location', 'vwc_percent', 'period', 'EC')  %>%
             mutate(sample_date = lubridate::as_date(sample_date, 
-                                                    format = "%m/%d/%Y")) %>%
-            mutate(year = lubridate::isoyear(ymd(sample_date))) %>%
-            mutate(month = lubridate::month(sample_date)) %>%
+                                                    format = "%m/%d/%Y"),
+                   year = lubridate::isoyear(ymd(sample_date)),
+                   month = lubridate::month(sample_date),
+                   week = lubridate::isoweek(ymd(sample_date)),
+                   bed_location = ifelse(bed_location == "hose", "center", bed_location)) %>%
             mutate_at(c('block', 'plot', 'treatment', 'crop', 'bed_location'), 
-                      as.factor)
+                      as.factor) 
 
 soil_vwc_rt <- soil_vwc_rt %>%
                mutate(date.time = lubridate::as_datetime(date.time,
@@ -177,48 +220,48 @@ soil_vwc_rt <- soil_vwc_rt %>%
                subset(date != "2023-10-04") %>%
                mutate_at('treatment' ,as.factor)
 
-#need flow rate to convert to volume
-irrigation <- irrigation %>%
-              mutate(date = lubridate::as_date(date, format = "%m/%d/%Y")) %>%
-              dplyr::select('date','total_time_hr')
-
 ```
 
 
 
-## Irrigation and Precipitation
+####  Identifying outliers
+```{r}
+#There are three samples where the soil moisture is is 64.8%. All of them are much higher than the other samples for that plot during the same week. I removed these as likely outliers
 
-### Visualization
+hist(soil_vwc$vwc_percent)
+
+out_vwc <- subset(soil_vwc, vwc_percent > 50)
+
+soil_vwc$vwc_percent[soil_vwc$vwc_percent > 50] <- NA
+
+hist(soil_vwc$vwc_percent)
+```
+
+
+
+#### summary tables
 ```{r}
 
+soil_vwc_crop_trt <- soil_vwc %>%
+                     group_by(treatment, crop, bed_location, sample_date, week, month, year) %>%
+                     summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+                     ungroup()
+
+soil_vwc_bed_crop_trt <- soil_vwc_crop_trt %>%
+                         group_by(treatment, crop, sample_date, week, month, year) %>%
+                         mutate(vwc_per_wk = ifelse(bed_location == "edge", vwc_per_wk*(-1), vwc_per_wk)) %>%
+                         summarize(loc_dif = sum(vwc_per_wk)) %>%
+                         ungroup()
+
+soil_vwc_trt <- soil_vwc %>%
+                group_by(treatment, bed_location, sample_date, week, month, year) %>%
+                summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+                ungroup()
+
 
 ```
 
-## Soil Moisture
-
-### Visualization
-
-```{r}
-
-
-```
-
-### Normality
-```{r}
-
-```
-
-### ANOVA
-```{r}
-
-```
-
-### Linear Mixed Model
-```{r}
-
-```
-
-## Soil Temperature
+## Temperature
 
 ### Visualization
 
@@ -299,4 +342,359 @@ ggplot() +
 
 
 
+## Irrigation and Precipitation
+During the growing season in 2023, there was 22.8 inches of rain recorded at the nearby weather station and 7.4 inches of water were applied to the study area via drip irrigation. Drip irrigation was largely utilized during a five week drought in May/June and a three week drought in August. In contrast, 2024 was a much wetter year, especially at the beginning of the season; there was 27.3 in of rain recorded and 2.4 inches of water were applied via drip irrigation during May and June. Only one irrigation event, at the end of June, was needed after the mulch treatments were applied. While there was also a period with minimal rain in late September/early October, we did not irrigate because the air temperatures were lower, bean/strawberry crops were not producing anymore, and the collards were not showing signs of water stress.
+
+
+### Visualization
+```{r}
+#I'm largely sticking to bar graphs here because I'll combine with the soil moisture visualization eventually
+
+# daily
+ggplot(subset(irrigation_day, month > 4 & month < 11 & year == 2023), aes(x = factor(date), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity") 
+  
+ggplot(subset(irrigation_day, month > 4 & month < 11 & year == 2024), aes(x = factor(date), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity") 
+
+# weekly
+ggplot(subset(irrigation_wk, month > 4 & month < 11 & year == 2023), aes(x = factor(week), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+  
+ggplot(subset(irrigation_wk, month > 4 & month < 11 & year == 2024), aes(x = factor(week), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+
+# monthly
+ggplot(subset(irrigation_mon, month > 4 & month < 11 & year == 2023), aes(x = factor(month), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+  
+ggplot(subset(irrigation_mon, month > 4 & month < 11 & year == 2024), aes(x = factor(month), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+
+# season
+ggplot(irrigation_season, aes(x = factor(year), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+
+```
+
+## Soil Moisture
+
+
+
+### Visualization
+
+Overview boxplots to diagnose problems. Addressed a row with NA for crop and treatment and changed bed location names to be consistent across years. Noting that there is defintely a differnce in soil moisture at the edge of plot between years (2024 is higher). Range of soil moisture values for edge is wider than for the centers. Average values don't seem much different between treatments and crops
+```{r}
+ggplot(soil_vwc, aes(x = treatment, y = vwc_percent, fill = bed_location)) + geom_boxplot() + facet_grid(~crop)
+
+ggplot(soil_vwc, aes(x = crop, y = vwc_percent, fill = bed_location)) + geom_boxplot() + facet_grid(~treatment)
+
+ggplot(subset(soil_vwc, bed_location == "center"), aes(x = crop, y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~year)
+
+ggplot(subset(soil_vwc, bed_location == "edge"), aes(x = crop, y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~year)
+
+ggplot(soil_vwc_bed_crop_trt, aes(x = as.factor(year), y = loc_dif, fill = treatment)) + geom_boxplot() 
+
+ 
+
+```
+
+Here, I visualize the soil moisture across the season for each treatment-crop-year. Soil moisture in the centers is visually similar for all treatments each week; a difference between treatments is clearer in 2024.
+```{r}
+
+ggplot() + 
+  geom_point(data = subset(soil_vwc, bed_location == "center"), aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
+  geom_line(data = subset(soil_vwc_crop_trt, bed_location == "center"), aes(x = week, y = vwc_per_wk, color = treatment)) + 
+  facet_wrap(~year + crop)
+
+ggplot() + 
+  geom_point(data = subset(soil_vwc, bed_location == "edge"), aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
+  geom_line(data = subset(soil_vwc_crop_trt, bed_location == "edge"), aes(x = week, y = vwc_per_wk, color = treatment)) + 
+  facet_wrap(~year + crop)
+
+ggplot(subset(soil_vwc, year == 2023), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot()
+ggplot(subset(soil_vwc, year == 2024), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot()
+
+```
+
+
+```{r}
+
+ggplot() + 
+  geom_point(data = soil_vwc, aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
+  geom_line(data = soil_vwc_trt, aes(x = week, y = vwc_per_wk, color = treatment)) + 
+  facet_wrap(~year + bed_location)
+
+
+```
+
+
+### Normality
+I have tried as many things I can think of for these transformations - boxcox, log, cubic, sqrt, and all for negatively skewed data. And the wild thing is that, visually, it looks like the most normally distributed dataset I've ever gotten to deal with 
+```{r}
+#retry the box cox transformation, then try splitting up the bed locations or years
+library(moments)
+library(ggpubr)
+
+hist(soil_vwc$vwc_percent)
+skewness(soil_vwc$vwc_percent, na.rm = TRUE)
+qqnorm(soil_vwc$vwc_percent, main='Normal')
+qqline(soil_vwc$vwc_percent)
+
+shapiro.test(soil_vwc$vwc_percent)
+```
+
+Box cox
+```{r}
+
+ggdensity(soil_vwc, x = "vwc_percent", fill = "lightgray", title = "vwc_percent") +
+  scale_x_continuous(limits = c(3, 12)) +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+
+bc <- boxcox(soil_vwc$vwc_percent ~ 1, lambda = seq(-6,6,0.1))
+lambda <- bc$x[which.max(bc$y)]
+soil_vwc$bc_vwc <- (soil_vwc$vwc_percent ^ lambda-1)/lambda
+skewness(soil_vwc$bc_vwc, na.rm = TRUE)
+
+hist(soil_vwc$bc_vwc)
+qqnorm(soil_vwc$bc_vwc, main='Normal')
+qqline(soil_vwc$bc_vwc)
+
+shapiro.test(soil_vwc$bc_vwc)
+
+
+ggdensity(soil_vwc, x = "bc_vwc", fill = "lightgray", title = "vwc_percent") +
+  scale_x_continuous(limits = c(3, 12)) +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+
+```
+
+Square root
+```{r}
+
+soil_vwc$sqrt_vwc <- sqrt(max(soil_vwc$vwc_percent +1, na.rm = TRUE) - soil_vwc$vwc_percent)
+
+skewness(soil_vwc$sqrt_vwc, na.rm = TRUE)
+
+hist(soil_vwc$sqrt_vwc)
+qqnorm(soil_vwc$sqrt_vwc, main='Normal')
+qqline(soil_vwc$sqrt_vwc)
+
+shapiro.test(soil_vwc$sqrt_vwc)
+
+
+ggdensity(soil_vwc, x = "sqrt_vwc", fill = "lightgray", title = "vwc_percent") +
+  scale_x_continuous(limits = c(3, 12)) +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+```
+
+### ANOVA
+```{r}
+
+```
+
+### Linear Mixed Model
+I was just messing around, and the best models seem to come when soil moisture is transformed using the sqrt and is subset by bed location, but I wasn't keeping track of AICs or anything. I need to move away from this until I check with Nic about the transformations.
+```{r}
+
+
+vwc_trt_wk_yr <- lmer(sqrt_vwc ~ treatment + (1 | year/week), subset(soil_vwc, bed_location == "edge"))
+summary(vwc_trt_wk_yr)
+AIC(vwc_trt_wk_yr)
+
+#extract random effects and residual values
+vwc_trt_wk_yr_re <- ranef(vwc_trt_wk_yr)
+vwc_trt_wk_yr_resid <- augment(vwc_trt_wk_yr)
+
+#generate qqplot
+plot(vwc_trt_wk_yr_re)
+
+#generate plot of fitted vs. residual values
+ggplot(vwc_trt_wk_yr_resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(vwc_trt_wk_yr)
+
+```
+
+
+
+
+
+
+```{r}
+
+# now I'm interested in samples that were very different from the others taken in the plot the same day
+vwc_range <- soil_vwc %>% 
+             group_by(sample_date, bed_location, block, plot) %>%
+             summarize(max_vwc = max(vwc_percent, na.rm = TRUE),
+                       min_vwc = min(vwc_percent, na.rm = TRUE),
+                       range_vwc = max_vwc - min_vwc) %>%
+             ungroup()
+
+hist(vwc_range$range_vwc)
+
+out_range <- subset(vwc_range, range_vwc > 10)
+
+# I checked all the samples >11, and then went back through the ones I thought I wanted to replace with NA and deleted several that, after working through more, looked like in the range of normal
+subset(soil_vwc, sample_date == "2024-09-25" & plot == "F" & block == "4")
+```
+
+```{r}
+# This point was much lower than the other measurements (28-34%) 
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2023-06-28" & 
+                              soil_vwc$plot == "B" & 
+                              soil_vwc$block == "2" & 
+                              soil_vwc$vwc_percent == 10.6] <- NA
+
+# This point was much lower than the other measurements (23-26%) 
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2023-06-28" & 
+                              soil_vwc$plot == "G" & 
+                              soil_vwc$block == "2" & 
+                              soil_vwc$vwc_percent == 11.1] <- NA
+
+# This point was much lower than the other measurements (20-30%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2023-07-13" & 
+                              soil_vwc$plot == "I" & 
+                              soil_vwc$block == "4" & 
+                              soil_vwc$vwc_percent == 8.0] <- NA
+
+# This point was much lower than the other measurements in same bed location (24-31%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2023-08-30" & 
+                              soil_vwc$plot == "E" & 
+                              soil_vwc$block == "1" & 
+                              soil_vwc$vwc_percent == 9.0] <- NA
+
+# This point was much lower than the other measurements (12-22%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2023-09-14" & 
+                              soil_vwc$plot == "H" & 
+                              soil_vwc$block == "2" & 
+                              soil_vwc$vwc_percent == 5.5] <- NA
+
+# This point was much lower than the other measurements (15-25%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2023-09-14" & 
+                              soil_vwc$plot == "C" & 
+                              soil_vwc$block == "2" & 
+                              soil_vwc$vwc_percent == 4.0] <- NA
+
+# This point was much lower than the other measurements (38-39%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2024-08-28" & 
+                              soil_vwc$plot == "C" & 
+                              soil_vwc$block == "1" & 
+                              soil_vwc$vwc_percent == 20.7] <- NA
+
+# This point was much higher than the other measurements(18)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2024-09-04" & 
+                              soil_vwc$plot == "D" & 
+                              soil_vwc$block == "4" & 
+                              soil_vwc$vwc_percent == 34.0] <- NA
+
+# This point was much higher than the other measurements
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2024-09-25" & 
+                              soil_vwc$plot == "I" & 
+                              soil_vwc$block == "4" & 
+                              soil_vwc$vwc_percent == 35.3] <- NA
+
+# This point was much higher than other measurements (12%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2024-09-25" & 
+                              soil_vwc$plot == "B" & 
+                              soil_vwc$block == "4" & 
+                              soil_vwc$vwc_percent == 27.2] <- NA
+
+# This point was much higher than other measurements (18-22%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2024-09-25" & 
+                              soil_vwc$plot == "A" & 
+                              soil_vwc$block == "2" & 
+                              soil_vwc$vwc_percent == 32.9] <- NA
+
+# This point was much lower than other measurements (14-18%)
+soil_vwc$vwc_percent[soil_vwc$sample_date == "2024-09-25" & 
+                              soil_vwc$plot == "F" & 
+                              soil_vwc$block == "4" & 
+                              soil_vwc$vwc_percent == 7.0] <- NA
+             
+```
+
+```{r}
+# from soil moisture outlier id. Combinations from out_range table that I checked but didn't take any action on.
+
+#I didn't mark several potential outliers as NA because while the total range was quite high, the measurements taken in the plot were more spread out (i.e., it wasn't just the one low or high point)
+# sample_date == "2023-06-22" & plot == "B" & block == "4"
+# sample_date == "2023-06-22" & plot == "C" & block == "1"
+# sample_date == "2023-06-22" & plot == "C" & block == "3"
+# sample_date == "2023-06-28" & plot == "A" & block == "4"
+# sample_date == "2023-06-28" & plot == "C" & block == "3"
+# sample_date == "2023-06-28" & plot == "C" & block == "4"
+# sample_date == "2023-06-28" & plot == "D" & block == "1"
+# sample_date == "2023-06-28" & plot == "F" & block == "4"
+# sample_date == "2023-06-28" & plot == "H" & block == "2"
+# sample_date == "2023-07-04" & plot == "H" & block == "3"
+# sample_date == "2023-07-26" & plot == "A" & block == "3"
+# sample_date == "2023-07-26" & plot == "B" & block == "2"
+# sample_date == "2023-07-26" & plot == "B" & block == "4"
+# sample_date == "2023-07-26" & plot == "G" & block == "3"
+# sample_date == "2023-07-26" & plot == "G" & block == "4"
+# sample_date == "2023-07-26" & plot == "I" & block == "3"
+# sample_date == "2023-07-31" & plot == "G" & block == "3"
+# sample_date == "2023-08-30" & plot == "C" & block == "2"
+# sample_date == "2023-08-30" & plot == "I" & block == "4"
+# sample_date == "2023-09-06" & plot == "C" & block == "4"
+# sample_date == "2023-09-06" & plot == "E" & block == "1"
+# sample_date == "2023-09-06" & plot == "G" & block == "3"
+# sample_date == "2023-09-14" & plot == "C" & block == "4"
+# sample_date == "2023-09-14" & plot == "G" & block == "3"
+# sample_date == "2023-09-27" & plot == "A" & block == "1"
+# sample_date == "2023-09-27" & plot == "C" & block == "2"
+# sample_date == "2023-09-27" & plot == "D" & block == "1"
+# sample_date == "2023-09-27" & plot == "I" & block == "3"
+# sample_date == "2023-09-27" & plot == "I" & block == "4"
+
+# sample_date == "2024-07-01" & plot == "A" & block == "3"
+# sample_date == "2024-07-01" & plot == "C" & block == "2"
+# sample_date == "2024-07-01" & plot == "E" & block == "1"
+# sample_date == "2024-07-01" & plot == "F" & block == "2"
+# sample_date == "2024-07-01" & plot == "G" & block == "2"
+# sample_date == "2024-07-12" & plot == "A" & block == "3"
+# sample_date == "2024-07-12" & plot == "B" & block == "4"
+# sample_date == "2024-07-12" & plot == "E" & block == "1"
+# sample_date == "2024-07-12" & plot == "F" & block == "2"
+# sample_date == "2024-07-12" & plot == "F" & block == "3"
+# sample_date == "2024-07-12" & plot == "G" & block == "4"
+# sample_date == "2024-07-16" & plot == "C" & block == "2"
+# sample_date == "2024-07-16" & plot == "E" & block == "1"
+# sample_date == "2024-07-16" & plot == "G" & block == "3"
+# sample_date == "2024-07-24" & plot == "C" & block == "1"
+# sample_date == "2024-07-24" & plot == "I" & block == "4"
+# sample_date == "2024-08-08" & plot == "D" & block == "1"
+# sample_date == "2024-08-08" & plot == "E" & block == "1"
+# sample_date == "2024-08-08" & plot == "G" & block == "3"
+# sample_date == "2024-08-12" & plot == "B" & block == "4"
+# sample_date == "2024-08-12" & plot == "I" & block == "1"
+# sample_date == "2024-08-12" & plot == "I" & block == "2"
+# sample_date == "2024-08-23" & plot == "D" & block == "1"
+# sample_date == "2024-08-23" & plot == "E" & block == "1"
+# sample_date == "2024-08-28" & plot == "F" & block == "4"
+# sample_date == "2024-08-28" & plot == "I" & block == "3"
+# sample_date == "2024-09-04" & plot == "A" & block == "2"
+# sample_date == "2024-09-04" & plot == "F" & block == "3"
+# sample_date == "2024-09-04" & plot == "G" & block == "1"
+# sample_date == "2024-09-04" & plot == "G" & block == "3"
+# sample_date == "2024-09-04" & plot == "H" & block == "1"
+# sample_date == "2024-09-25" & plot == "D" & block == "1"
+
+
+#conflicted about these
+# sample_date == "2023-06-28" & plot == "D" & block == "3
+# sample_date == "2023-06-28" & plot == "E" & block == "3"
+# sample_date == "2023-08-30" & plot == "B" & block == "3"
+# sample_date == "2023-09-14" & plot == "B" & block == "3"
+# sample_date == "2023-09-20" & plot == "B" & block == "3"
+# sample_date == "2023-09-20" & plot == "I" & block == "4"
+# sample_date == "2024-08-28" & plot == "I" & block == "2"
+# sample_date == "2024-07-01" & plot == "C" & block == "4"
+# sample_date == "2024-08-08" & plot == "B" & block == "4"
+# sample_date == "2024-08-08" & plot == "D" & block == "1"
+# sample_date == "2024-07-01" & plot == "G" & block == "2"
+# sample_date == "2024-07-12" & plot == "G" & block == "1"
+# sample_date == "2024-07-24" & plot == "A" & block == "2"
+# sample_date == "2024-07-24" & plot == "B" & block == "2"
+# sample_date == "2024-07-24" & plot == "C" & block == "2"
+# sample_date == "2024-08-23" & plot == "D" & block == "3"
+# sample_date == "2024-08-28" & plot == "D" & block == "1"
+# sample_date == "2024-09-25" & plot == "I" & block == "3"
+
+```
 
