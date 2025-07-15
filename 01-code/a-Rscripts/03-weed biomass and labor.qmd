@@ -14,13 +14,14 @@ library(here)
 ```
 
 ## Loading Data
+
 ```{r}
 weed_biomass <- read.csv(here::here("00-data", "b-prepared", 
-                                 "20250530_SCM-weed biomass.csv"), 
+                                 "20250714_SCM-weed biomass.csv"), 
                       header = TRUE)
 
 weed_labor <- read.csv(here::here("00-data", "b-prepared", 
-                                  "20250530_SCM-weed labor.csv"), 
+                                  "20250714_SCM-weed labor.csv"), 
                      header = TRUE)
 
 ```
@@ -28,54 +29,255 @@ weed_labor <- read.csv(here::here("00-data", "b-prepared",
 ## Format Data
 
 ```{r}
+weed_biomass <- weed_biomass %>%
+                subset(block != 5) %>%
+                mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
+                       year = lubridate::isoyear(ymd(date_collected)),
+                       od_g = ifelse(od_biomass_calculated_g < 0, 0, od_biomass_calculated_g)) %>%
+                mutate_at(c('weeding_point', 'block', 'plot', 'treatment', 'crop'), as.factor)
 
+weed_labor <- weed_labor %>%
+              subset(block != 5) %>% 
+              mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
+                     year = lubridate::isoyear(ymd(date_collected))) %>%
+              mutate_at(c('weeding_point', 'block', 'plot', 'treatment', 'crop', "collected_by"), as.factor) %>%
+              dplyr::select(-c(start.time, end.time, total.time))
 ```
-
 
 ## Weed Biomass
 
 ### Visualization
 
+Most representative of statistical analysis
 ```{r}
+#crops combined, year visualized by weed collection/treatment
+ggplot(weed_biomass, aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
 
+```
+
+Additional visualizations
+```{r}
+#visualized each year separately, by weed collection for each crop/treatment
+ggplot(subset(weed_biomass, year == 2023), aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+ggplot(subset(weed_biomass, year == 2024), aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+
+#years combined, visualized by weed collection for each crop/treatment
+ggplot(weed_biomass, aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+
+#weeding point combined, visualized by crop/treatment for each year
+ggplot(weed_biomass, aes(x = crop, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+
+#weeding point and year combined, visualized by crop/treatment
+ggplot(weed_biomass, aes(x = crop, y = od_g, fill = treatment)) + geom_boxplot()
+
+#crops and weeding point combined, visualized by treatment for each year
+ggplot(weed_biomass, aes(x = as.factor(year), y = od_g, fill = treatment)) + geom_boxplot()
+
+# just treatments
+ggplot(weed_biomass, aes(x = treatment, y = od_g)) + geom_boxplot()
 
 ```
 
 ### Normality
+Is it possible to transform this to a normal distribution, and if not, how do I analyze it?
+
 ```{r}
+library(moments) #skewness function
+
+hist(weed_biomass$od_g)
+skewness(weed_biomass$od_g, na.rm = TRUE)
+qqnorm(weed_biomass$od_g, main='Normal')
+qqline(weed_biomass$od_g)
+shapiro.test(weed_biomass$od_g)
+
+bc <- boxcox(lm((weed_biomass$od_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+weed_biomass$bc_od <- ((weed_biomass$od_g + 1) ^ lambda -1)/lambda
 
 ```
 
-### ANOVA
+
+### One way tests
+
 ```{r}
+library(FSA)          # <3>
+kruskal.test(od_g ~ year, weed_biomass) # p < 0.001, so analyzing years separately
+
+kruskal.test(od_g ~ weeding_point, subset(weed_biomass, year == "2023")) # p < 0.001, so analyzing each weeding point separately
+kruskal.test(od_g ~ weeding_point, subset(weed_biomass, year == "2024")) # p < 0.001, so analyzing each weeding point separately
+```
+
+#### 2023
+
+##### Weeding Day 1
+When crops are combined, there were significantly more weeds in bare soil compared to cardboard mulch (p < 0.002). Weed biomass under straw mulch was not significantly different from bare soil or cardboard.
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "1")) # p > 0.05, so combining crops to look at treatments
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "1"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "1")) 
+
+```
+
+##### Weeding Day 2
+When crops are combined, there were significantly less weed biomass under cardboard mulch compared to bare soil (p = 0.007) and straw mulch (p = 0.02). 
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "2")) # p > 0.05, so combining crops to look at treatments
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "2"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "2")) 
+
+```
+
+##### Weeding Day 3
+When we reached the third weeding day, there was a significant difference in weed biomass between crops was observed (p = 0.01). For strawberries, weed biomass under cardboard mulch was significantly less than bare soil (p = 0.03). All other crop-treatment combinations were not significantly different from each other. 
+
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "3")) # p = 0.01, so crops are analyzed individually (plus I also combine for consistency with previous days)
+
+#Strawberries 
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "AS"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "AS")) 
+
+#Dragon tongue beans 
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "DB"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "DB")) 
+
+#Collards
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "FC"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "FC")) 
+
+#crops combined
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3")) 
+
+```
+##### Weeding Day 4
+Mulch treatment did not impact weed biomass during our fourth collection point (p = 0.4).
+
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "4")) # p = 0.4, so crops were combined
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "4"))
+
+```
+
+#### 2024
+
+##### Weeding Day 1
+When crops were combined, weed biomass was significantly higher in bare soil compared to both mulch treatments (p < 0.001). There was not, however, a difference in biomass between cardboard and straw mulch (p = 0.5).
+
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & weeding_point == "1")) # p > 0.05, so combining crops to look at treatments
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "1"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "1")) 
+
+```
+
+##### Weeding Day 2
+When crops were combined, weed biomass was significantly higher in bare soil compared to cardboard (p < 0.001) and straw (p = 0.004) mulch. There was not, however, a difference in biomass between the two mulches (p = 0.6) 
+
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & weeding_point == "2")) # p > 0.05, so combining crops to look at treatments
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "2"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "2")) 
+
+```
+
+##### Weeding Day 3
+When we reached the third weeding day, however, weed biomass in bare soil was only significantly higher than cardboard mulch (p = 0.009).
+
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & weeding_point == "3")) # p > 0.05, so combining crops to look at treatments
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "3"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "3")) 
+
+```
+
+##### Weeding Day 4
+During our final weeding day, weed biomass in bare soil remained significantly higher than for cardboard mulch (p = 0.003). However, now, weed biomass in straw mulch was also significantly higher than for cardboard (p < 0.001)
+
+```{r}
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & weeding_point == "4")) # p > 0.05, so combining crops to look at treatments
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "4"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point == "4")) 
 
 ```
 
 ### Linear Mixed Model
+
 ```{r}
 
 ```
 
-## Soil Temperature
+## Weed Labor 
 
 ### Visualization
-
+This makes me have suspicions about whether they were using hand tools to weed in 2024.
 ```{r}
+#visualized each year separately, by weed collection for each crop/treatment
+ggplot(subset(weed_labor, year == 2023), aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+ggplot(subset(weed_labor, year == 2024), aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
 
+#years combined, visualized by weed collection for each crop/treatment
+ggplot(weed_labor, aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+
+#weeding point combined, visualized by crop/treatment for each year
+ggplot(weed_labor, aes(x = crop, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+
+#weeding point and year combined, visualized by crop/treatment
+ggplot(weed_labor, aes(x = crop, y = time_min, fill = treatment)) + geom_boxplot()
+
+#crops combined, year visualized by weed collection/treatment
+ggplot(weed_labor, aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+
+#crops and weeding point combined, visualized by treatment for each year
+ggplot(weed_labor, aes(x = as.factor(year), y = time_min, fill = treatment)) + geom_boxplot()
+
+# just treatments
+ggplot(weed_labor, aes(x = treatment, y = time_min)) + geom_boxplot()
 
 ```
 
 ### Normality
+
 ```{r}
+hist(weed_labor$time_min)
+skewness(weed_labor$time_min, na.rm = TRUE)
+qqnorm(weed_labor$time_min, main='Normal')
+qqline(weed_labor$time_min)
+shapiro.test(weed_labor$time_min)
+```
+# log transformation
+```{r}
+weed_labor$log_time <- log10(weed_labor$time_min)
+hist(weed_labor$log_time)
+skewness(weed_labor$log_time, na.rm = TRUE)
+qqnorm(weed_labor$log_time, main='Normal')
+qqline(weed_labor$log_time)
+shapiro.test(weed_labor$log_time)
+
+```
+# boxcox transformation
+This gets me slightly closer to a normal distribution
+```{r}
+bc <- boxcox(lm(weed_labor$time_min ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+weed_labor$bc_time <- (weed_labor$time_min ^ lambda -1)/lambda
+
+hist(weed_labor$bc_time)
+skewness(weed_labor$bc_time, na.rm = TRUE)
+qqnorm(weed_labor$bc_time, main='Normal')
+qqline(weed_labor$bc_time)
+shapiro.test(weed_labor$bc_time)
 
 ```
 
 ### ANOVA
+
 ```{r}
 
 ```
 
 ### Linear Mixed Model
+
 ```{r}
 
 ```

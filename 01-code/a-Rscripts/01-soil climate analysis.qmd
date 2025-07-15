@@ -16,6 +16,7 @@ library(MASS) #boxcox transformation
 library(lme4)         #mixed models
 library(lmerTest)     #mixed models
 library(broom.mixed)  #mixed models
+library(emmeans)
 
 ```
 
@@ -26,7 +27,7 @@ soil_temp <- read.csv(here::here("00-data", "b-prepared",
                       header = TRUE)
 
 soil_vwc <- read.csv(here::here("00-data", "b-prepared", 
-                                 "20250530_SCM-soil-moisture.csv"), 
+                                 "20250712_SCM-soil-moisture.csv"), 
                      header = TRUE)
 
 soil_vwc_rt <- read.csv(here::here("00-data", "b-prepared", 
@@ -59,18 +60,22 @@ soil_temp <- soil_temp %>%
                                 ifelse(year == "2024" & month < 5,1,
                                  2)))
 
+#data frame for the min, max, and average soil temp each day for each temp probe
 soil_temp_day <- soil_temp %>%
                  group_by(ID, block, plot, treatment, crop, year, study_yr, month, week, date) %>%
                  summarize(day_max = max(temp_C, na.rm = TRUE),
                            day_min = min(temp_C, na.rm = TRUE),
-                           day_avg = (day_max + day_min)/2) %>%
+                           day_avg = (day_max + day_min)/2, 
+                           tmp_dif = day_max - day_min) %>%
                  ungroup() 
 
+#average max, min, and mean soil temp for the day for each treatment
 soil_temp_trt <- soil_temp_day %>%
                  group_by(treatment, year, week, month, study_yr, date) %>%
                  summarize(trt_avg_max = mean(day_max, na.rm = TRUE),
                            trt_avg_min = mean(day_min, na.rm = TRUE),
-                           trt_avg = (trt_avg_max + trt_avg_min)/2) %>%
+                           trt_avg = (trt_avg_max + trt_avg_min)/2,
+                           trt_dif = trt_avg_max - trt_avg_min) %>%
                  ungroup()
 
 # ALERT: there's a weird quirk in the first and last days of the year, where they are part of the week from a different year. So that's worth checking, either to see if there's a better function or to just remove those weirdo dates from the calculation
@@ -81,6 +86,7 @@ soil_temp_wk <- soil_temp_day %>%
                           wk_avg = (wk_avg_max + wk_avg_min) /2) %>%
                 ungroup()
 
+#min, max, and average soil temp for each month
 soil_temp_month <- soil_temp_day %>%
                    group_by(treatment, year, study_yr, month) %>%
                    summarize(mon_avg_max = mean(day_max, na.rm = TRUE),
@@ -88,6 +94,7 @@ soil_temp_month <- soil_temp_day %>%
                              mon_avg = (mon_avg_max + mon_avg_min) / 2) %>%
                    ungroup()
 
+#min, max, and average soil temp for May through October
 soil_temp_season <- soil_temp_day %>%
                     subset(month > 4 & month < 11) %>%
                     group_by(treatment, year, study_yr) %>%
@@ -100,6 +107,7 @@ soil_temp_season <- soil_temp_day %>%
 ```{r}
 
 #check with Nic to see if changing trace precip to 0.001 in was appropriate
+#creating month and week columns, limiting dataset to the years I'm interested in, changing units from standard to metric
 temp_precip_day <- temp_precip %>%
                    rename(max_temp_F = Maximum.Temperature.degrees..F.,
                           min_temp_F = Minimum.Temperature.degrees..F.,
@@ -126,7 +134,7 @@ temp_wk <- temp_precip_day %>%
                      wk_avg_temp_C = (wk_avg_temp_max + wk_avg_temp_min) /2) %>%
            ungroup()
 
-
+#mean for the max, min, and average daily air temps each month
 temp_mon <- temp_precip_day %>%
             group_by(year, month) %>%
             summarize(mon_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
@@ -134,6 +142,7 @@ temp_mon <- temp_precip_day %>%
                       mon_avg_temp_C = (mon_avg_temp_max + mon_avg_temp_min) / 2) %>%
             ungroup()
 
+#mean for the max, min, and average daily air temps across the whole season
 temp_season <- temp_precip_day %>%
                subset(month > 4 & month < 11) %>%
                group_by(year) %>%
@@ -142,6 +151,7 @@ temp_season <- temp_precip_day %>%
                          season_avg_temp_C = (season_avg_temp_max + season_avg_temp_min) / 2) %>%
                ungroup()
 
+#mean for the max, min, and average daily air temp across the whole year
 temp_yr <- temp_precip_day %>%
            group_by(year) %>%
            summarize(yr_avg_temp_max = mean(max_temp_C, na.rm = TRUE),
@@ -152,6 +162,7 @@ temp_yr <- temp_precip_day %>%
 ### Irrigation and Precipitation
 
 ```{r}
+#creating columns for different time markers and for the type of irrigation
 drip_irrigation <- drip_irrigation %>%
                    mutate(date = lubridate::as_date(date, format = "%m/%d/%Y"),
                           year = lubridate::isoyear(ymd(date)), 
@@ -160,28 +171,33 @@ drip_irrigation <- drip_irrigation %>%
                           type = "drip") %>%
                    dplyr::select('date', 'year', 'month', 'week', 'type', 'irrigation_in')
 
+#combining precipitation and drip irrigation into a single table
 irrigation_day <- temp_precip_day %>%
                   mutate(type = "precip") %>%
                   rename(irrigation_in = precip_in) %>%
                   dplyr::select('date','year','month','week','type','irrigation_in') %>%
                   rbind(drip_irrigation)
 
+#total water input by type each week
 irrigation_wk <- irrigation_day %>%
                  group_by(year, month, week, type) %>%
                  summarize(irrigation_in = sum(irrigation_in)) %>%
                  ungroup()
 
+#total water input by type each month
 irrigation_mon <- irrigation_day %>%
                   group_by(year, month, type) %>%
                   summarize(irrigation_in = sum(irrigation_in)) %>%
                   ungroup()
 
+#total water input by type for May through October
 irrigation_season <- irrigation_day %>%
                      subset(month > 4 & month < 11) %>%
                      group_by(year, type) %>%
                      summarize(irrigation_in = sum(irrigation_in)) %>%
                      ungroup()
 
+#total water input by type for the whole year
 irrigation_yr <- irrigation_day %>%
                  group_by(year, type) %>%
                  summarize(irrigation_in = sum(irrigation_in)) %>%
@@ -192,6 +208,7 @@ irrigation_yr <- irrigation_day %>%
 
 ### Soil Moisture
 ```{r}
+#formatting data frame for soil moisture data from TDR
 soil_vwc <- soil_vwc %>%
             subset(block != "5") %>%
             dplyr::select('sample_date', 'block','plot', 'treatment', 'crop', 
@@ -202,9 +219,10 @@ soil_vwc <- soil_vwc %>%
                    month = lubridate::month(sample_date),
                    week = lubridate::isoweek(ymd(sample_date)),
                    bed_location = ifelse(bed_location == "hose", "center", bed_location)) %>%
-            mutate_at(c('block', 'plot', 'treatment', 'crop', 'bed_location'), 
+            mutate_at(c('year', 'block', 'plot', 'treatment', 'crop', 'bed_location'), 
                       as.factor) 
 
+#formatting data frame from continuous logger
 soil_vwc_rt <- soil_vwc_rt %>%
                mutate(date.time = lubridate::as_datetime(date.time,
                                                          format = "%m/%d/%Y %H:%M")) %>%
@@ -226,7 +244,7 @@ soil_vwc_rt <- soil_vwc_rt %>%
 
 ####  Identifying outliers
 ```{r}
-#There are three samples where the soil moisture is is 64.8%. All of them are much higher than the other samples for that plot during the same week. I removed these as likely outliers
+#There are three samples where the soil moisture is is 64.8%. All of them are much higher than the other samples for that plot during the same week. I removed these as outliers.
 
 hist(soil_vwc$vwc_percent)
 
@@ -241,23 +259,44 @@ hist(soil_vwc$vwc_percent)
 
 #### summary tables
 ```{r}
+#average soil moisture by treatment, crop, plot, edge/center, and date
+soil_vwc_wk <- soil_vwc %>%
+               group_by(treatment, crop, block, plot, bed_location, sample_date, week, month, year) %>%
+               summarize(vwc_avg_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+               ungroup()
 
-soil_vwc_crop_trt <- soil_vwc %>%
-                     group_by(treatment, crop, bed_location, sample_date, week, month, year) %>%
-                     summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
-                     ungroup()
+#calculating the average soil moisture by treatment, crop, edge/center, and date
+soil_vwc_wk_trt_crop <- soil_vwc %>%
+                        group_by(treatment, crop, bed_location, sample_date, week, month, year) %>%
+                        summarize(vwc_trt_avg_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+                        ungroup()
 
-soil_vwc_bed_crop_trt <- soil_vwc_crop_trt %>%
+#average soil moisture by treatment, edge/center, and date (combines crops)
+soil_vwc_wk_trt <- soil_vwc %>%
+                   group_by(treatment, bed_location, sample_date, week, month, year) %>%
+                   summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+                   ungroup()
+
+#average soil moisture by crop, edge/center, and date (combines treatments)
+soil_vwc_wk_crop <- soil_vwc %>%
+                    group_by(crop, bed_location, sample_date, week, month, year) %>%
+                    summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+                    ungroup()
+
+
+#calculating the average soil moisture for difference in soil moisture between center and edge for each plot and day
+soil_vwc_dif_plot <- soil_vwc_wk %>%
+                     pivot_wider(names_from = bed_location,
+                            values_from = vwc_avg_wk) %>%
+                     mutate(vwc_plot = (center + edge)/2,
+                            loc_dif = center - edge)
+
+#calculating the treatment/crop average for difference in soil moisture between center and edge  for each day
+soil_vwc_dif_trt_crop <- soil_vwc_dif_plot %>%
                          group_by(treatment, crop, sample_date, week, month, year) %>%
-                         mutate(vwc_per_wk = ifelse(bed_location == "edge", vwc_per_wk*(-1), vwc_per_wk)) %>%
-                         summarize(loc_dif = sum(vwc_per_wk)) %>%
+                         summarize(vwc_trt = mean(vwc_plot),
+                                  vwc_dif_trt_avg = mean(loc_dif, na.rm = TRUE)) %>%
                          ungroup()
-
-soil_vwc_trt <- soil_vwc %>%
-                group_by(treatment, bed_location, sample_date, week, month, year) %>%
-                summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
-                ungroup()
-
 
 ```
 
@@ -273,6 +312,7 @@ ggplot(subset(soil_temp_day, treatment == "BM"), aes(x = date, y = day_avg, colo
 ggplot(subset(soil_temp_day, treatment == "CM"), aes(x = date, y = day_avg, color = ID)) + geom_point() 
 
 ggplot(subset(soil_temp_day, treatment == "SM"), aes(x = date, y = day_avg, color = ID)) + geom_point() 
+
 
 ```
 Following differences in average air temp, soil temperature was higher in 2023 compared to 2024, particularly in July and August (Table X, Figure X)
@@ -306,6 +346,15 @@ ggplot() +
   theme_bw()
 
 ggplot() + 
+  geom_line(data = subset(soil_temp_trt, year == "2023" & 
+                                    month > 4 & 
+                                    month < 11), 
+       aes(x = date, 
+           y = trt_dif, 
+           color = treatment)) +
+  theme_bw()
+
+ggplot() + 
   geom_line(data = subset(soil_temp_trt, year == "2024" & 
                                     month > 4 & 
                                     month < 11), 
@@ -317,6 +366,16 @@ ggplot() +
                                     month < 11), 
             aes(x = date, 
                 y = avg_temp_C)) +
+  theme_bw()
+
+
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt, year == "2024" & 
+                                    month > 4 & 
+                                    month < 11), 
+       aes(x = date, 
+           y = trt_dif, 
+           color = treatment)) +
   theme_bw()
 
 ```
@@ -376,17 +435,13 @@ ggplot(irrigation_season, aes(x = factor(year), y = irrigation_in, fill=type, co
 
 ### Visualization
 
-Overview boxplots to diagnose problems. Addressed a row with NA for crop and treatment and changed bed location names to be consistent across years. Noting that there is defintely a differnce in soil moisture at the edge of plot between years (2024 is higher). Range of soil moisture values for edge is wider than for the centers. Average values don't seem much different between treatments and crops
+Overview boxplots to diagnose problems. Addressed a row with NA for crop and treatment and changed bed location names to be consistent across years. Noting that there is definitely a differnce in soil moisture at the edge of plot between years (2024 is higher). Range of soil moisture values for edge is wider than for the centers. Average values don't seem much different between treatments and crops
 ```{r}
-ggplot(soil_vwc, aes(x = treatment, y = vwc_percent, fill = bed_location)) + geom_boxplot() + facet_grid(~crop)
+ggplot(soil_vwc, aes(x = treatment, y = vwc_percent, fill = bed_location)) + geom_boxplot() + facet_grid(~crop) + ggtitle("Soil Moisture for Edge vs. Center of plot")
 
-ggplot(soil_vwc, aes(x = crop, y = vwc_percent, fill = bed_location)) + geom_boxplot() + facet_grid(~treatment)
+ggplot(soil_vwc, aes(x = crop, y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_wrap(~bed_location + year) + ggtitle("Soil Moisture by Bed location and year")
 
-ggplot(subset(soil_vwc, bed_location == "center"), aes(x = crop, y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~year)
-
-ggplot(subset(soil_vwc, bed_location == "edge"), aes(x = crop, y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~year)
-
-ggplot(soil_vwc_bed_crop_trt, aes(x = as.factor(year), y = loc_dif, fill = treatment)) + geom_boxplot() 
+ggplot(soil_vwc_dif_plot, aes(x = crop, y = loc_dif, fill = treatment)) + geom_boxplot() + facet_grid(~year)
 
  
 
@@ -397,35 +452,33 @@ Here, I visualize the soil moisture across the season for each treatment-crop-ye
 
 ggplot() + 
   geom_point(data = subset(soil_vwc, bed_location == "center"), aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
-  geom_line(data = subset(soil_vwc_crop_trt, bed_location == "center"), aes(x = week, y = vwc_per_wk, color = treatment)) + 
+  geom_line(data = subset(soil_vwc_wk_trt_crop, bed_location == "center"), aes(x = week, y = vwc_trt_avg_wk, color = treatment)) + 
   facet_wrap(~year + crop)
 
 ggplot() + 
   geom_point(data = subset(soil_vwc, bed_location == "edge"), aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
-  geom_line(data = subset(soil_vwc_crop_trt, bed_location == "edge"), aes(x = week, y = vwc_per_wk, color = treatment)) + 
+  geom_line(data = subset(soil_vwc_wk_trt_crop, bed_location == "edge"), aes(x = week, y = vwc_trt_avg_wk, color = treatment)) + 
   facet_wrap(~year + crop)
 
-ggplot(subset(soil_vwc, year == 2023), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot()
-ggplot(subset(soil_vwc, year == 2024), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot()
+
+#based on readings, I think this is actually the plot I'll uses in the publication
+ggplot(subset(soil_vwc, year == 2023), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~crop)
+ggplot(subset(soil_vwc, year == 2024), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~crop)
+
+ggplot(subset(soil_vwc, year == 2023 & bed_location == "center"), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~crop)
+ggplot(subset(soil_vwc, year == 2024 & bed_location == "center"), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~crop)
+
+ggplot(subset(soil_vwc, year == 2023 & bed_location == "edge"), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~crop)
+ggplot(subset(soil_vwc, year == 2024 & bed_location == "edge"), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~crop)
 
 ```
 
 
-```{r}
-
-ggplot() + 
-  geom_point(data = soil_vwc, aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
-  geom_line(data = soil_vwc_trt, aes(x = week, y = vwc_per_wk, color = treatment)) + 
-  facet_wrap(~year + bed_location)
-
-
-```
 
 
 ### Normality
-I have tried as many things I can think of for these transformations - boxcox, log, cubic, sqrt, and all for negatively skewed data. And the wild thing is that, visually, it looks like the most normally distributed dataset I've ever gotten to deal with 
+I have tried as many things I can think of for these transformations - boxcox, log, cubic, sqrt, and all for negatively skewed data. I also tried splitting the dataset into edge and center, and then running transformations. And the wild thing is that, visually, it looks like the most normally distributed dataset I've ever gotten to deal with 
 ```{r}
-#retry the box cox transformation, then try splitting up the bed locations or years
 library(moments)
 library(ggpubr)
 
@@ -435,6 +488,7 @@ qqnorm(soil_vwc$vwc_percent, main='Normal')
 qqline(soil_vwc$vwc_percent)
 
 shapiro.test(soil_vwc$vwc_percent)
+
 ```
 
 Box cox
@@ -481,8 +535,59 @@ ggdensity(soil_vwc, x = "sqrt_vwc", fill = "lightgray", title = "vwc_percent") +
   stat_overlay_normal_density(color = "red", linetype = "dashed")
 ```
 
-### ANOVA
+### ANOVA 
+
+
+#### overall
 ```{r}
+model <- aov(sqrt_vwc ~ treatment*crop, soil_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+
+model <- aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023"))
+AIC(model)
+summary(model)
+TukeyHSD(model)
+
+model <- aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024"))
+AIC(model)
+summary(model)
+TukeyHSD(model)
+```
+
+
+#### 2023
+If I need to go forward with weekly analysis, then I would need to do Tukey HSD tests
+```{r}
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "25")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "26")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "27")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "28")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "29")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "30")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "31")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "35")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "36")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "37")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "38")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "39")))
+
+```
+
+#### 2024
+If I need to go forward with weekly analysis, then I would need to do Tukey HSD tests
+```{r}
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "27")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "28")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "29")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "30")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "32")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "33")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "34")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "35")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "36")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "39")))
 
 ```
 
@@ -490,24 +595,24 @@ ggdensity(soil_vwc, x = "sqrt_vwc", fill = "lightgray", title = "vwc_percent") +
 I was just messing around, and the best models seem to come when soil moisture is transformed using the sqrt and is subset by bed location, but I wasn't keeping track of AICs or anything. I need to move away from this until I check with Nic about the transformations.
 ```{r}
 
-
-vwc_trt_wk_yr <- lmer(sqrt_vwc ~ treatment + (1 | year/week), subset(soil_vwc, bed_location == "edge"))
-summary(vwc_trt_wk_yr)
-AIC(vwc_trt_wk_yr)
+model <- lmer(sqrt_vwc ~ treatment*crop + (1 | year/week/block), data = soil_vwc)
+AIC(model)
+summary(model)
 
 #extract random effects and residual values
-vwc_trt_wk_yr_re <- ranef(vwc_trt_wk_yr)
-vwc_trt_wk_yr_resid <- augment(vwc_trt_wk_yr)
+re <- ranef(model)
+resid <- augment(model)
 
 #generate qqplot
-plot(vwc_trt_wk_yr_re)
+plot(re)
 
 #generate plot of fitted vs. residual values
-ggplot(vwc_trt_wk_yr_resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 
 #ranked likelihood test
-ranova(vwc_trt_wk_yr)
+ranova(model)
 
+emmeans(model, pairwise ~ treatment*crop)
 ```
 
 
