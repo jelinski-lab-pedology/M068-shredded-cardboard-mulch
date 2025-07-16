@@ -592,7 +592,7 @@ summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week ==
 ```
 
 ### Linear Mixed Model
-I was just messing around, and the best models seem to come when soil moisture is transformed using the sqrt and is subset by bed location, but I wasn't keeping track of AICs or anything. I need to move away from this until I check with Nic about the transformations.
+Noting that model results live here: https://docs.google.com/spreadsheets/d/16b8dL3h7Hl0gyc-eoVd-CrQ_Gf6J7o4LrDXqP7GE_BE/edit?gid=0#gid=0
 ```{r}
 
 model <- lmer(sqrt_vwc ~ treatment*crop + (1 | year/week/block), data = soil_vwc)
@@ -618,7 +618,7 @@ emmeans(model, pairwise ~ treatment*crop)
 
 
 
-
+##Extra code from when I was being more aggressive about removing potential outliers
 
 ```{r}
 

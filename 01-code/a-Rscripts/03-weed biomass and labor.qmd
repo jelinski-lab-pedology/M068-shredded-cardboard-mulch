@@ -40,7 +40,7 @@ weed_labor <- weed_labor %>%
               subset(block != 5) %>% 
               mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
                      year = lubridate::isoyear(ymd(date_collected))) %>%
-              mutate_at(c('weeding_point', 'block', 'plot', 'treatment', 'crop', "collected_by"), as.factor) %>%
+              mutate_at(c('weeding_point', 'block', 'plot', 'treatment', 'crop', "collected_by", "year"), as.factor) %>%
               dplyr::select(-c(start.time, end.time, total.time))
 ```
 
@@ -209,6 +209,47 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point =
 
 ## Weed Labor 
 
+### checking for impact of person weeding
+I didn't actually do this first, but I found what was likely a mis-recorded time that I want to remove from analysis
+
+```{r}
+# weeding time visualized for each person  
+ggplot(subset(weed_labor, year == "2023"), aes(x = treatment, y = time_min, color = collected_by)) + geom_boxplot() 
+ggplot(subset(weed_labor, year == "2024" & treatment == "CM"), aes(x = weeding_point, y = time_min, color = collected_by)) + geom_boxplot() 
+
+plots_by_person <- weed_labor %>%
+                   group_by(treatment, collected_by) %>%
+                   summarize(count = n(),
+                             avg_time = mean(time_min)) %>%
+                   ungroup()
+plots_by_person
+
+# I checked for interactions with who did the weeding, and I didn't see any concerning ones. (I went through the TukeyHSD results and checked each comparison where two people had weeded the same mulch treatment. Only one combination was signicant for SM: Trick and Nora, and I know from our notes and my memories that Trick just happened to tackle several plots that were especially weedy)
+aov <- aov(bc_time ~ treatment*collected_by, data = subset(weed_labor, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+
+# Checking for differences in weeding time for different people in 2024. I went through the TukeyHSD results and checked each comparison where two people had weeded the same mulch treatment. Morgan Smith was significantly different than MH (slightly: 0.07), NP (0.006), PM (0.001), and RD (0.001) for cardboard mulch, and slight different from PM for straw mulch (0.06). When compared to the ggplot, I noted that NP weeded earlier in the season (and thus would likely have had longer weeding times). MH had times that were in a similar range with other people who weeded the same weeks as they did. Comparing with biomass, PM was in charge of a plot with A LOT of weed biomass during the second weed collection. RD, however, weeded 1-E during the second collection point, and there was only 0.99 g of dried biomass but it took them 68 minutes. I'm assuming that this was an error recording time and, consequently, removed.
+aov <- aov(bc_time ~ treatment*collected_by, data = subset(weed_labor, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+
+#use this if you actually want to see the whole output in the previous tukey hsd
+#options(max.print = 2150)
+
+ggplot(subset(weed_labor, year == "2024" & treatment == "CM"), aes(x = weeding_point, y = time_min, color = collected_by)) + geom_boxplot() 
+
+
+```
+
+
+```{r}
+#creating a copy that includes the suspected bad data (weed_labor_out) so I can check whether it impacts analysis
+weed_labor_out <- weed_labor
+weed_labor$time_min[weed_labor$weeding_point == "2" & weed_labor$block == "1" & weed_labor$plot == "E" & weed_labor$year == "2024"] <- NA
+
+```
+
 ### Visualization
 This makes me have suspicions about whether they were using hand tools to weed in 2024.
 ```{r}
@@ -233,6 +274,7 @@ ggplot(weed_labor, aes(x = as.factor(year), y = time_min, fill = treatment)) + g
 
 # just treatments
 ggplot(weed_labor, aes(x = treatment, y = time_min)) + geom_boxplot()
+
 
 ```
 
@@ -272,12 +314,66 @@ shapiro.test(weed_labor$bc_time)
 
 ### ANOVA
 
+#### Initial
 ```{r}
+#This demonstrates treatment, crop, and year have a significant effect == but only treatment year has a significant interaction effect. 
+aov <- aov(bc_time ~ treatment*crop*year, data = weed_labor)
+summary(aov)
+TukeyHSD(aov)
+
+#Based on broader results above, I'm analyzing each year separtely. 
+#In this first ANOVA for 2023, only treatment is significant
+aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+
+# In 2023, bare soil and cardboard mulch required similar time to weed, but straw mulch was significantly different from both
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+
+
+# In 2024, there was once again no interaction between treatment and crop. Crop had a potential significant impact on weeding time (0.05) in the ANOVA, but not the Tukey HSD
+aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+
+# In 2024, we saw a different trend. This year, cardboard mulch required significantly less weeding time than both bare soil and straw mulch (and there was no significant difference between bare soil and straw).
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+
+# Still, I'm curious about if we analyze the years together. We cardboard mulch is significantly different from bare soil and straw. Straw mulch and bare soil are *nearly* significantly different (0.06)
+aov <- aov(bc_time ~ treatment, data = weed_labor)
+summary(aov)
+TukeyHSD(aov)
 
 ```
+#### For each weeding day (from LMM results)
+
+
+
 
 ### Linear Mixed Model
 
 ```{r}
+model <- lmer(bc_time ~ treatment*crop*year + (1 | weeding_point/block), data = weed_labor)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+#emmeans(model, pairwise ~ treatment*year)
 
 ```
