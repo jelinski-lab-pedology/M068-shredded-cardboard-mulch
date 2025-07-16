@@ -10,17 +10,22 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(here)
-
+library(MASS) #boxcox transformation
+library(lme4)         #mixed models
+library(lmerTest)     #mixed models
+library(broom.mixed)  #mixed models
+library(emmeans)
 ```
 
 ## Loading Data
+
 ```{r}
 yield <- read.csv(here::here("00-data", "b-prepared", 
                              "20250530_SCM-yield.csv"), 
                       header = TRUE)
 
 spad <- read.csv(here::here("00-data", "b-prepared", 
-                            "20250530_SCM-SPAD.csv"), 
+                            "20250716_SCM-SPAD.csv"), 
                      header = TRUE)
 
 ```
@@ -29,8 +34,18 @@ spad <- read.csv(here::here("00-data", "b-prepared",
 
 ```{r}
 #separate edge data
-```
 
+
+spad <- spad %>%
+        subset(block != 5) %>% 
+        dplyr::select(-average_reading) %>%
+        mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
+               year = lubridate::isoyear(ymd(date_collected))) %>%
+        pivot_longer(cols = c("reading_1", "reading_2", "reading_3"),
+                     names_to = "reading",
+                     values_to = "value") %>%
+        mutate_at(c('sampling','block', 'plot', 'treatment', 'crop', "year"), as.factor)
+```
 
 ## Yield
 
@@ -42,16 +57,19 @@ spad <- read.csv(here::here("00-data", "b-prepared",
 ```
 
 ### Normality
+
 ```{r}
 
 ```
 
 ### ANOVA
+
 ```{r}
 
 ```
 
 ### Linear Mixed Model
+
 ```{r}
 
 ```
@@ -60,22 +78,106 @@ spad <- read.csv(here::here("00-data", "b-prepared",
 
 ### Visualization
 
+Most relevant visual for my analysis thus far
 ```{r}
 
+#sampling combined, visualized by crop/treatment for each year
+ggplot(spad, aes(x = crop, y = value, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
 
+```
+
+
+Other visualizations
+```{r}
+
+#visualized each year separately, by sampling for each crop/treatment
+ggplot(subset(spad, year == 2023), aes(x = sampling, y = value, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+ggplot(subset(spad, year == 2024), aes(x = sampling, y = value, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+
+#years combined, visualized by sampling for each crop/treatment. REVISE THIS LATER, since there are a different number of sampling dates in each year
+ggplot(spad, aes(x = sampling, y = value, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+
+#sampling and year combined, visualized by crop/treatment. 
+ggplot(spad, aes(x = crop, y = value, fill = treatment)) + geom_boxplot()
+
+#crops combined, year visualized by sampling/treatment
+ggplot(spad, aes(x = sampling, y = value, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+
+#treatments combined, year visualized by sampling/crop
+ggplot(spad, aes(x = sampling, y = value, fill = crop)) + geom_boxplot() + facet_wrap(~year)
+
+#crops and sampling combined, visualized by treatment for each year
+ggplot(spad, aes(x = year, y = value, fill = treatment)) + geom_boxplot()
+
+#treatments and sampling combined, visualized by crop for each year
+ggplot(spad, aes(x = year, y = value, fill = crop)) + geom_boxplot()
+
+# just treatments
+ggplot(spad, aes(x = treatment, y = value)) + geom_boxplot()
+
+#just crops
+ggplot(spad, aes(x = crop, y = value)) + geom_boxplot()
 ```
 
 ### Normality
+At what point do we mark values as NA because the SPAD just can't go that high?
+
 ```{r}
+hist(spad$value)
+skewness(spad$value, na.rm = TRUE)
+qqnorm(spad$value, main='Normal')
+qqline(spad$value)
+shapiro.test(spad$value)
+```
+
+#### boxcox transformation
+This gets me closer to a normal distribution
+```{r}
+bc <- boxcox(lm(spad$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad$bc_value <- (spad$value ^ lambda -1)/lambda
+
+hist(spad$bc_value)
+skewness(spad$bc_value, na.rm = TRUE)
+qqnorm(spad$bc_value, main='Normal')
+qqline(spad$bc_value)
+shapiro.test(spad$bc_value)
 
 ```
 
-### ANOVA
+### Kruskal-Wallis
+
 ```{r}
+#across the whole data set, there is a difference between crops
+kruskal.test(value ~ year, data = spad)
+kruskal.test(value ~ treatment, data = spad)
+kruskal.test(value ~ crop, data = spad)
+
+#within each crop, there is a difference between years
+kruskal.test(value ~ year, data = subset(spad, crop == "AS"))
+kruskal.test(value ~ year, data = subset(spad, crop == "DB"))
+kruskal.test(value ~ year, data = subset(spad, crop == "FC"))
+
+#within each crop, there is only a difference between treatments for AS
+kruskal.test(value ~ treatment, data = subset(spad, crop == "AS"))
+kruskal.test(value ~ treatment, data = subset(spad, crop == "DB"))
+kruskal.test(value ~ treatment, data = subset(spad, crop == "FC"))
+
+
+#within a crop-year combination, there is a significant difference between treatments for AS in 2023, between DB in 2024, and between FC in 2024
+kruskal.test(value ~ treatment, data = subset(spad, crop == "AS" & year == "2023"))
+kruskal.test(value ~ treatment, data = subset(spad, crop == "AS" & year == "2024"))
+
+kruskal.test(value ~ treatment, data = subset(spad, crop == "DB" & year == "2023"))
+kruskal.test(value ~ treatment, data = subset(spad, crop == "DB" & year == "2024"))
+
+kruskal.test(value ~ treatment, data = subset(spad, crop == "DB" & year == "2023"))
+kruskal.test(value ~ treatment, data = subset(spad, crop == "DB" & year == "2024"))
 
 ```
 
 ### Linear Mixed Model
+
 ```{r}
 
 ```

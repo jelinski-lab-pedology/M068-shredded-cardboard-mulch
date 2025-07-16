@@ -477,6 +477,9 @@ ggplot(subset(soil_vwc, year == 2024 & bed_location == "edge"), aes(x = as.facto
 
 
 ### Normality
+(note to self to try analyzing the bed locations separately, see if there is a difference)
+
+
 I have tried as many things I can think of for these transformations - boxcox, log, cubic, sqrt, and all for negatively skewed data. I also tried splitting the dataset into edge and center, and then running transformations. And the wild thing is that, visually, it looks like the most normally distributed dataset I've ever gotten to deal with 
 ```{r}
 library(moments)

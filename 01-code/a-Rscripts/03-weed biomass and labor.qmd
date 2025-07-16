@@ -257,6 +257,17 @@ weed_labor$time_min[weed_labor$weeding_point == "2" & weed_labor$block == "1" & 
 
 ### Visualization
 This makes me have suspicions about whether they were using hand tools to weed in 2024.
+
+Visualizations I'm most likely to use:
+```{r}
+#crops combined, year visualized by weed collection/treatment
+ggplot(weed_labor, aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+
+#crops and weeding point combined, visualized by treatment for each year
+ggplot(weed_labor, aes(x = as.factor(year), y = time_min, fill = treatment)) + geom_boxplot()
+
+```
+
 ```{r}
 #visualized each year separately, by weed collection for each crop/treatment
 ggplot(subset(weed_labor, year == 2023), aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
@@ -274,9 +285,6 @@ ggplot(weed_labor, aes(x = crop, y = time_min, fill = treatment)) + geom_boxplot
 #crops combined, year visualized by weed collection/treatment
 ggplot(weed_labor, aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
 
-#crops and weeding point combined, visualized by treatment for each year
-ggplot(weed_labor, aes(x = as.factor(year), y = time_min, fill = treatment)) + geom_boxplot()
-
 # just treatments
 ggplot(weed_labor, aes(x = treatment, y = time_min)) + geom_boxplot()
 
@@ -292,7 +300,7 @@ qqnorm(weed_labor$time_min, main='Normal')
 qqline(weed_labor$time_min)
 shapiro.test(weed_labor$time_min)
 ```
-# log transformation
+#### log transformation
 ```{r}
 weed_labor$log_time <- log10(weed_labor$time_min)
 hist(weed_labor$log_time)
@@ -302,7 +310,7 @@ qqline(weed_labor$log_time)
 shapiro.test(weed_labor$log_time)
 
 ```
-# boxcox transformation
+#### boxcox transformation
 This gets me slightly closer to a normal distribution
 ```{r}
 bc <- boxcox(lm(weed_labor$time_min ~ 1))
