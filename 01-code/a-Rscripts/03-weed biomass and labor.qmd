@@ -10,6 +10,11 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(here)
+library(MASS) #boxcox transformation
+library(lme4)         #mixed models
+library(lmerTest)     #mixed models
+library(broom.mixed)  #mixed models
+library(emmeans)
 
 ```
 
@@ -327,37 +332,184 @@ aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2023"))
 summary(aov)
 TukeyHSD(aov)
 
-# In 2023, bare soil and cardboard mulch required similar time to weed, but straw mulch was significantly different from both
+# In 2023, both ANOVA and KW found that bare soil and cardboard mulch required similar time to weed, and straw mulch was significantly different from both
 aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023"))
 summary(aov)
 TukeyHSD(aov)
 
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023"))
 
 # In 2024, there was once again no interaction between treatment and crop. Crop had a potential significant impact on weeding time (0.05) in the ANOVA, but not the Tukey HSD
 aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2024"))
 summary(aov)
 TukeyHSD(aov)
 
-# In 2024, we saw a different trend. This year, cardboard mulch required significantly less weeding time than both bare soil and straw mulch (and there was no significant difference between bare soil and straw).
+
+# In 2024, from ANOVA and KW, we saw a different trend. This year, cardboard mulch required significantly less weeding time than both bare soil and straw mulch (and there was no significant difference between bare soil and straw).
 aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024"))
 summary(aov)
 TukeyHSD(aov)
 
-# Still, I'm curious about if we analyze the years together. We cardboard mulch is significantly different from bare soil and straw. Straw mulch and bare soil are *nearly* significantly different (0.06)
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024"))
+
+# Still, I'm curious about if we analyze the years together. Using the ANOVA, cardboard mulch is significantly different from bare soil and straw. Straw mulch and bare soil are *nearly* significantly different (0.06). In the KW, all treatments are significantly different from each other
 aov <- aov(bc_time ~ treatment, data = weed_labor)
 summary(aov)
 TukeyHSD(aov)
 
+kruskal.test(time_min ~ treatment, data = weed_labor)
+dunnTest(time_min ~ treatment, data = weed_labor)
+
 ```
-#### For each weeding day (from LMM results)
+
+#### 2023
+note that I did check each week for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model. 
+
+##### Weeding Day 1
+Straw mulch is significantly different from cardboard and bare soil. Cardboard is nearly significantly different (0.06). KW test shows slightly different results; only straw mulch and cardboard mulch are significantly different
+```{r}
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "1"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "1"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "1"))
+
+```
+
+##### Weeding Day 2
+Straw mulch is significantly different from cardboard and bare soil. 
+```{r}
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "2"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "2"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "2"))
+
+```
+
+##### Weeding Day 3
+In a one-way for treatment, straw mulch is significantly different from bare soil and cardboard mulch. 
+
+In a one-way for crop, there were no significant differences. 
+
+Looking at interactions, a significant difference between FC and DB appeared (0.04). The Tukey HSD indicates that:
+BM: no significant difference between crops
+SM: no significant difference between crops
+CM: no significant difference between crops
+
+AS: straw is significantly different from bare soil
+DB: no significant difference between mulch treatments
+FC: straw is significantly different from bare soil
+```{r}
+aov <- aov(bc_time ~ treatment+crop, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
+
+
+aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
+summary(aov)
+TukeyHSD(aov)
 
 
 
+```
+##### Weeding Day 4
+According to the ANOVA, all mulches are signifcantly different from each other. According to the KW, only straw mulch and cardboard mulch are significantly different (though the others are close)
+```{r}
+
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "4"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "4"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "4"))
+
+```
+
+#### 2024
+note that I did check each weeding day for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model.
+
+##### Weeding Day 1
+No significant difference between mulch treatments
+```{r}
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
+
+```
+##### Weeding Day 2
+According to the ANOVA, cardboard mulch was significantly different from bare soil and straw. Note that the LMM for block showed that block impacted results, though ultimately the relationship between treatments was the same.
+
+According to the KW, though, cardboard was only significantly different from bare soil
+```{r}
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "2"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "2"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "2"))
+
+```
+
+##### Weeding Day 3
+cardboard wasn't quite significantly different from bare soil (0.06), though it becomes significant (0.04) if crop is added (though there are no significant differences between crops, nor are there any significant interactions)
+
+In the KW, cardboard and straw are significantly different
+
+```{r}
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
+
+aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
+summary(aov)
+TukeyHSD(aov)
+
+```
+##### Weeding Day 4
+According to both ANOVA and KW, cardboard was significantly different from bare soil and straw. There was a significant difference for crops as well, between collards and strawberries/beans. Looking at interactions:
+
+BM: no significant difference between crops
+CM: no significant difference between crops (FC and DB nearly so, though)
+SM: no significant difference between crops
+
+AS: cardboard was significantly different from bare soil & straw
+DB: no significant difference between mulches
+FC: cardboard was significantly different from bare soil
+
+There's a handful of other interactions for different crop/mulch combinations, but not taking the time to go through them right now
+
+```{r}
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
+summary(aov)
+TukeyHSD(aov)
+
+kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
+
+aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
+summary(aov)
+TukeyHSD(aov)
+
+```
 
 ### Linear Mixed Model
 
 ```{r}
-model <- lmer(bc_time ~ treatment*crop*year + (1 | weeding_point/block), data = weed_labor)
+model <- lmer(bc_time ~ treatment*crop + (1 | block), data = subset(weed_labor, year == "2024" & weeding_point == "4"))
 AIC(model)
 summary(model)
 
@@ -374,6 +526,6 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 #ranked likelihood test
 ranova(model)
 
-#emmeans(model, pairwise ~ treatment*year)
+emmeans(model, pairwise ~ treatment)
 
 ```
