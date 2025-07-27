@@ -54,6 +54,7 @@ weed_labor <- weed_labor %>%
 ### Visualization
 
 Most representative of statistical analysis
+
 ```{r}
 #crops combined, year visualized by weed collection/treatment
 ggplot(weed_biomass, aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
@@ -61,6 +62,7 @@ ggplot(weed_biomass, aes(x = weeding_point, y = od_g, fill = treatment)) + geom_
 ```
 
 Additional visualizations
+
 ```{r}
 #visualized each year separately, by weed collection for each crop/treatment
 ggplot(subset(weed_biomass, year == 2023), aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
@@ -84,6 +86,7 @@ ggplot(weed_biomass, aes(x = treatment, y = od_g)) + geom_boxplot()
 ```
 
 ### Normality
+
 Is it possible to transform this to a normal distribution, and if not, how do I analyze it?
 
 ```{r}
@@ -101,7 +104,6 @@ weed_biomass$bc_od <- ((weed_biomass$od_g + 1) ^ lambda -1)/lambda
 
 ```
 
-
 ### One way tests
 
 ```{r}
@@ -115,7 +117,9 @@ kruskal.test(od_g ~ weeding_point, subset(weed_biomass, year == "2024")) # p < 0
 #### 2023
 
 ##### Weeding Day 1
-When crops are combined, there were significantly more weeds in bare soil compared to cardboard mulch (p < 0.002). Weed biomass under straw mulch was not significantly different from bare soil or cardboard.
+
+When crops are combined, there were significantly more weeds in bare soil compared to cardboard mulch (p \< 0.002). Weed biomass under straw mulch was not significantly different from bare soil or cardboard.
+
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "1")) # p > 0.05, so combining crops to look at treatments
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "1"))
@@ -124,7 +128,9 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point =
 ```
 
 ##### Weeding Day 2
-When crops are combined, there were significantly less weed biomass under cardboard mulch compared to bare soil (p = 0.007) and straw mulch (p = 0.02). 
+
+When crops are combined, there were significantly less weed biomass under cardboard mulch compared to bare soil (p = 0.007) and straw mulch (p = 0.02).
+
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "2")) # p > 0.05, so combining crops to look at treatments
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "2"))
@@ -133,7 +139,8 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point =
 ```
 
 ##### Weeding Day 3
-When we reached the third weeding day, there was a significant difference in weed biomass between crops was observed (p = 0.01). For strawberries, weed biomass under cardboard mulch was significantly less than bare soil (p = 0.03). All other crop-treatment combinations were not significantly different from each other. 
+
+When we reached the third weeding day, there was a significant difference in weed biomass between crops was observed (p = 0.01). For strawberries, weed biomass under cardboard mulch was significantly less than bare soil (p = 0.03). All other crop-treatment combinations were not significantly different from each other.
 
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "3")) # p = 0.01, so crops are analyzed individually (plus I also combine for consistency with previous days)
@@ -155,7 +162,9 @@ kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_poi
 dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3")) 
 
 ```
+
 ##### Weeding Day 4
+
 Mulch treatment did not impact weed biomass during our fourth collection point (p = 0.4).
 
 ```{r}
@@ -167,7 +176,8 @@ kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_poi
 #### 2024
 
 ##### Weeding Day 1
-When crops were combined, weed biomass was significantly higher in bare soil compared to both mulch treatments (p < 0.001). There was not, however, a difference in biomass between cardboard and straw mulch (p = 0.5).
+
+When crops were combined, weed biomass was significantly higher in bare soil compared to both mulch treatments (p \< 0.001). There was not, however, a difference in biomass between cardboard and straw mulch (p = 0.5).
 
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & weeding_point == "1")) # p > 0.05, so combining crops to look at treatments
@@ -177,7 +187,8 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point =
 ```
 
 ##### Weeding Day 2
-When crops were combined, weed biomass was significantly higher in bare soil compared to cardboard (p < 0.001) and straw (p = 0.004) mulch. There was not, however, a difference in biomass between the two mulches (p = 0.6) 
+
+When crops were combined, weed biomass was significantly higher in bare soil compared to cardboard (p \< 0.001) and straw (p = 0.004) mulch. There was not, however, a difference in biomass between the two mulches (p = 0.6)
 
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & weeding_point == "2")) # p > 0.05, so combining crops to look at treatments
@@ -187,6 +198,7 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point =
 ```
 
 ##### Weeding Day 3
+
 When we reached the third weeding day, however, weed biomass in bare soil was only significantly higher than cardboard mulch (p = 0.009).
 
 ```{r}
@@ -197,7 +209,8 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point =
 ```
 
 ##### Weeding Day 4
-During our final weeding day, weed biomass in bare soil remained significantly higher than for cardboard mulch (p = 0.003). However, now, weed biomass in straw mulch was also significantly higher than for cardboard (p < 0.001)
+
+During our final weeding day, weed biomass in bare soil remained significantly higher than for cardboard mulch (p = 0.003). However, now, weed biomass in straw mulch was also significantly higher than for cardboard (p \< 0.001)
 
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & weeding_point == "4")) # p > 0.05, so combining crops to look at treatments
@@ -212,9 +225,10 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point =
 
 ```
 
-## Weed Labor 
+## Weed Labor
 
 ### checking for impact of person weeding
+
 I didn't actually do this first, but I found what was likely a mis-recorded time that I want to remove from analysis
 
 ```{r}
@@ -247,7 +261,6 @@ ggplot(subset(weed_labor, year == "2024" & treatment == "CM"), aes(x = weeding_p
 
 ```
 
-
 ```{r}
 #creating a copy that includes the suspected bad data (weed_labor_out) so I can check whether it impacts analysis
 weed_labor_out <- weed_labor
@@ -256,9 +269,11 @@ weed_labor$time_min[weed_labor$weeding_point == "2" & weed_labor$block == "1" & 
 ```
 
 ### Visualization
+
 This makes me have suspicions about whether they were using hand tools to weed in 2024.
 
 Visualizations I'm most likely to use:
+
 ```{r}
 #crops combined, year visualized by weed collection/treatment
 ggplot(weed_labor, aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
@@ -300,7 +315,9 @@ qqnorm(weed_labor$time_min, main='Normal')
 qqline(weed_labor$time_min)
 shapiro.test(weed_labor$time_min)
 ```
+
 #### log transformation
+
 ```{r}
 weed_labor$log_time <- log10(weed_labor$time_min)
 hist(weed_labor$log_time)
@@ -310,8 +327,11 @@ qqline(weed_labor$log_time)
 shapiro.test(weed_labor$log_time)
 
 ```
+
 #### boxcox transformation
+
 This gets me slightly closer to a normal distribution
+
 ```{r}
 bc <- boxcox(lm(weed_labor$time_min ~ 1))
 lambda <- bc$x[which.max(bc$y)]
@@ -328,6 +348,7 @@ shapiro.test(weed_labor$bc_time)
 ### ANOVA
 
 #### Initial
+
 ```{r}
 #This demonstrates treatment, crop, and year have a significant effect == but only treatment year has a significant interaction effect. 
 aov <- aov(bc_time ~ treatment*crop*year, data = weed_labor)
@@ -373,10 +394,13 @@ dunnTest(time_min ~ treatment, data = weed_labor)
 ```
 
 #### 2023
-note that I did check each week for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model. 
+
+note that I did check each week for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model.
 
 ##### Weeding Day 1
+
 Straw mulch is significantly different from cardboard and bare soil. Cardboard is nearly significantly different (0.06). KW test shows slightly different results; only straw mulch and cardboard mulch are significantly different
+
 ```{r}
 aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "1"))
 summary(aov)
@@ -388,7 +412,9 @@ dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weedin
 ```
 
 ##### Weeding Day 2
-Straw mulch is significantly different from cardboard and bare soil. 
+
+Straw mulch is significantly different from cardboard and bare soil.
+
 ```{r}
 aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "2"))
 summary(aov)
@@ -400,18 +426,15 @@ dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weedin
 ```
 
 ##### Weeding Day 3
-In a one-way for treatment, straw mulch is significantly different from bare soil and cardboard mulch. 
 
-In a one-way for crop, there were no significant differences. 
+In a one-way for treatment, straw mulch is significantly different from bare soil and cardboard mulch.
 
-Looking at interactions, a significant difference between FC and DB appeared (0.04). The Tukey HSD indicates that:
-BM: no significant difference between crops
-SM: no significant difference between crops
-CM: no significant difference between crops
+In a one-way for crop, there were no significant differences.
 
-AS: straw is significantly different from bare soil
-DB: no significant difference between mulch treatments
-FC: straw is significantly different from bare soil
+Looking at interactions, a significant difference between FC and DB appeared (0.04). The Tukey HSD indicates that: BM: no significant difference between crops SM: no significant difference between crops CM: no significant difference between crops
+
+AS: straw is significantly different from bare soil DB: no significant difference between mulch treatments FC: straw is significantly different from bare soil
+
 ```{r}
 aov <- aov(bc_time ~ treatment+crop, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
 summary(aov)
@@ -428,8 +451,11 @@ TukeyHSD(aov)
 
 
 ```
+
 ##### Weeding Day 4
+
 According to the ANOVA, all mulches are signifcantly different from each other. According to the KW, only straw mulch and cardboard mulch are significantly different (though the others are close)
+
 ```{r}
 
 aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "4"))
@@ -442,10 +468,13 @@ dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weedin
 ```
 
 #### 2024
+
 note that I did check each weeding day for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model.
 
 ##### Weeding Day 1
+
 No significant difference between mulch treatments
+
 ```{r}
 aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
 summary(aov)
@@ -455,10 +484,13 @@ kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & we
 dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
 
 ```
+
 ##### Weeding Day 2
+
 According to the ANOVA, cardboard mulch was significantly different from bare soil and straw. Note that the LMM for block showed that block impacted results, though ultimately the relationship between treatments was the same.
 
 According to the KW, though, cardboard was only significantly different from bare soil
+
 ```{r}
 aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "2"))
 summary(aov)
@@ -470,6 +502,7 @@ dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weedin
 ```
 
 ##### Weeding Day 3
+
 cardboard wasn't quite significantly different from bare soil (0.06), though it becomes significant (0.04) if crop is added (though there are no significant differences between crops, nor are there any significant interactions)
 
 In the KW, cardboard and straw are significantly different
@@ -487,16 +520,14 @@ summary(aov)
 TukeyHSD(aov)
 
 ```
+
 ##### Weeding Day 4
+
 According to both ANOVA and KW, cardboard was significantly different from bare soil and straw. There was a significant difference for crops as well, between collards and strawberries/beans. Looking at interactions:
 
-BM: no significant difference between crops
-CM: no significant difference between crops (FC and DB nearly so, though)
-SM: no significant difference between crops
+BM: no significant difference between crops CM: no significant difference between crops (FC and DB nearly so, though) SM: no significant difference between crops
 
-AS: cardboard was significantly different from bare soil & straw
-DB: no significant difference between mulches
-FC: cardboard was significantly different from bare soil
+AS: cardboard was significantly different from bare soil & straw DB: no significant difference between mulches FC: cardboard was significantly different from bare soil
 
 There's a handful of other interactions for different crop/mulch combinations, but not taking the time to go through them right now
 
@@ -517,7 +548,7 @@ TukeyHSD(aov)
 ### Linear Mixed Model
 
 ```{r}
-model <- lmer(bc_time ~ treatment*crop + (1 | block), data = subset(weed_labor, year == "2024" & weeding_point == "4"))
+model <- lmer(bc_time ~ treatment*block + (1 | block), data = subset(weed_labor, year == "2024"))
 AIC(model)
 summary(model)
 

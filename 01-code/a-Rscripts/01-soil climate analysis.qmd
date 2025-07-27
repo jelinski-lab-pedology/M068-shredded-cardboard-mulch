@@ -439,7 +439,7 @@ Overview boxplots to diagnose problems. Addressed a row with NA for crop and tre
 ```{r}
 ggplot(soil_vwc, aes(x = treatment, y = vwc_percent, fill = bed_location)) + geom_boxplot() + facet_grid(~crop) + ggtitle("Soil Moisture for Edge vs. Center of plot")
 
-ggplot(soil_vwc, aes(x = crop, y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_wrap(~bed_location + year) + ggtitle("Soil Moisture by Bed location and year")
+ggplot(soil_vwc, aes(x = crop, y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_wrap(~year + bed_location) + ggtitle("Soil Moisture by Bed location and year")
 
 ggplot(soil_vwc_dif_plot, aes(x = crop, y = loc_dif, fill = treatment)) + geom_boxplot() + facet_grid(~year)
 

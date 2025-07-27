@@ -10,10 +10,18 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(here)
+library(moments)
+library(MASS) #boxcox transformation
+library(lme4)         #mixed models
+library(lmerTest)     #mixed models
+library(broom.mixed)  #mixed models
+library(emmeans)
+library(FSA)
 
 ```
 
 ## Loading Data
+
 ```{r}
 #will also need to add in 
 soil_fert <- read.csv(here::here("00-data", "b-prepared", 
@@ -21,7 +29,7 @@ soil_fert <- read.csv(here::here("00-data", "b-prepared",
                            header = TRUE)
 
 bd <- read.csv(here::here("00-data", "b-prepared", 
-                          "20250530_SCM-BD.csv"), 
+                          "20250718_SCM-BD.csv"), 
                      header = TRUE)
 
 ```
@@ -29,6 +37,23 @@ bd <- read.csv(here::here("00-data", "b-prepared",
 ## Format Data
 
 ```{r}
+soil_fert <- soil_fert %>%
+             subset(block != 5) %>%
+             unite(col = "unique_ID", c("block", "plot"), sep = ".", remove = FALSE) %>%
+             mutate(sample_date = lubridate::as_date(sample_date, format = "%m/%d/%Y"),
+                    month = lubridate::month(sample_date),
+                    year = lubridate::isoyear(ymd(sample_date)),
+                    cn_ratio = total_c_wt_pct/total_n_wt_pct) %>%
+             mutate_at(c('unique_ID', 'block', 'plot', 'treatment', 'crop', 'year', 'month'), as.factor)
+
+start_end <- soil_fert %>%
+             subset((month == 5 & year == "2023") | (month == 10 & year == "2024"))
+
+bd <- bd %>%
+      subset(block != 5) %>%
+      mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
+             year = lubridate::isoyear(ymd(date_collected))) %>%
+      mutate_at(c('block', 'plot', 'treatment', 'crop'), as.factor)
 
 ```
 
@@ -36,57 +61,510 @@ bd <- read.csv(here::here("00-data", "b-prepared",
 
 ```{r}
 
+#really just doing this for the initial soil properties, but figured might as well do it for all dates
+avg_trt_crop <- soil_fert %>%
+                group_by(sample_date, treatment, crop) %>%
+                summarize(avg_pH = mean(pH),
+                          avg_p_ppm = mean(bray_p_ppm),
+                          avg_k_ppm = mean(k_ppm),
+                          avg_NO3_ppm = mean(NO3_ppm),
+                          avg_NH4_ppm = mean(NH4_ppm),
+                          avg_c_pct = mean(total_c_wt_pct),
+                          avg_n_pct = mean(total_n_wt_pct)) %>%
+                ungroup()
+
+# only for initial soil properties, but easiest to summarize for each date                     
+initial_agg <- soil_fert %>%
+               group_by(sample_date) %>%
+               summarize(avg_pH = mean(pH),
+                         avg_p_ppm = mean(bray_p_ppm),
+                         avg_k_ppm = mean(k_ppm),
+                         avg_NO3_ppm = mean(NO3_ppm),
+                         avg_NH4_ppm = mean(NH4_ppm),
+                         avg_c_pct = mean(total_c_wt_pct),
+                         avg_n_pct = mean(total_n_wt_pct)) %>%
+               ungroup()
 
 ```
 
 ## Phosphorus
+In summary, there's a significant difference in soil P between the start and end of the experiment, and between May and October each year. However, there are no significant differences between treatments and/or crops. The only time there is *maybe* as significant difference is between bare soil and straw mulch in October 2024. But if I really do cut off at 0.05, then it's not.
 
 ### Visualization
 
+This is the visualization that best reflects the results
 ```{r}
+# P by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = bray_p_ppm, fill = treatment)) + geom_boxplot() 
 
+ggplot(soil_fert, aes(x = sample_date, y = bray_p_ppm, color = treatment)) + geom_point() + geom_smooth(method = lm)
 
 ```
 
-### Normality
 ```{r}
+# P by sample date for each crop-treatment combination
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = bray_p_ppm, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
 
+ggplot(soil_fert, aes(x = sample_date, y = bray_p_ppm, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+
+# P by sample date for each crop
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = bray_p_ppm, fill = crop)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = bray_p_ppm, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# P by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = bray_p_ppm)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = bray_p_ppm)) + geom_point() + geom_smooth(method = lm)
+
+# P overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = bray_p_ppm, fill = treatment)) + geom_boxplot()
+
+# P overall for treatment
+ggplot(soil_fert, aes(x = treatment, y = bray_p_ppm)) + geom_boxplot()
+
+# P overall for crop
+ggplot(soil_fert, aes(x = crop, y = bray_p_ppm)) + geom_boxplot()
+
+# P for 2023 by crop-treatment
+ggplot(soil_fert, aes(x = crop, y = bray_p_ppm, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+
+# P for 2023 by treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = treatment, y = bray_p_ppm)) + geom_boxplot()
+
+# P for 2023 by crop
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = bray_p_ppm)) + geom_boxplot()
+
+
+# P for 2024 by crop-treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = bray_p_ppm, fill = treatment)) + geom_boxplot()
+
+# P for 2024 by treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = treatment, y = bray_p_ppm)) + geom_boxplot()
+
+# P for 2024 by crop
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = bray_p_ppm)) + geom_boxplot()
+```
+
+
+
+### Normality
+
+#### full data set
+Transformation gets closer to normal distribution
+```{r}
+hist(soil_fert$bray_p_ppm)
+skewness(soil_fert$bray_p_ppm, na.rm = TRUE)
+qqnorm(soil_fert$bray_p_ppm, main='Normal')
+qqline(soil_fert$bray_p_ppm)
+shapiro.test(soil_fert$bray_p_ppm)
+```
+
+```{r}
+bc <- boxcox(lm(soil_fert$bray_p_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_p <- (soil_fert$bray_p_ppm ^ lambda -1)/lambda
+
+hist(soil_fert$bc_p)
+skewness(soil_fert$bc_p, na.rm = TRUE)
+qqnorm(soil_fert$bc_p, main='Normal')
+qqline(soil_fert$bc_p)
+shapiro.test(soil_fert$bc_p)
+
+```
+#### comparing start and end
+```{r}
+hist(start_end$bray_p_ppm)
+skewness(start_end$bray_p_ppm, na.rm = TRUE)
+qqnorm(start_end$bray_p_ppm, main='Normal')
+qqline(start_end$bray_p_ppm)
+shapiro.test(start_end$bray_p_ppm)
+
+bc <- boxcox(lm(start_end$bray_p_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+start_end$bc_p <- (start_end$bray_p_ppm ^ lambda -1)/lambda
 ```
 
 ### ANOVA
+
+
+#### All data
 ```{r}
+
+#initial anova shows there is a significant difference between years. diagnostic plots indicate not normally distributed, but KW reinforces it. So, in terms of analyzing treatment and crop, it makes sense to do the years separately (in addition to the change from start to end of the experiment)
+aov <- aov(bc_p ~ treatment*crop*year, data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(bray_p_ppm ~ year, data = soil_fert)
+
+
+aov <- aov(bc_p ~ year, data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
 
 ```
 
-### Linear Mixed Model
+#### Comparing start and end of experiment
 ```{r}
 
+#ANOVA shows no significant difference between treatments or crops for start and end of the experiment -- but the data also isn't normally distributed
+aov <- aov(bc_p ~ treatment*crop, data = start_end)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#okay, running KW tests, it's clear that there are significant differences between the beginning and end of the experiment. And it's true for all treatments and crops, and the combinations -- but pretty equally true, to be honest? Like that no one treatment or crops has more of an effect than the others
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "BM"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "SM"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "CM"))
+
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, crop == "AS"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, crop == "DB"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, crop == "FC"))
+
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "BM" & crop == "AS"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "BM" & crop == "DB"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "BM" & crop == "FC"))
+
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "SM" & crop == "AS"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "SM" & crop == "DB"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "SM" & crop == "FC"))
+
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "CM" & crop == "AS"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "CM" & crop == "DB"))
+kruskal.test(bray_p_ppm ~ year, data = subset(start_end, treatment == "CM" & crop == "FC"))
+
+```
+#### 2023
+
+For the whole year: There is no significant differences in soil P between treatments and crops (or their interactions). Data is normally distributed, and KW tests back up this conclusion.
+```{r}
+aov <- aov(bc_p ~ treatment*crop, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, year == "2023"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, year == "2023"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, year == "2023"))
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, crop == "AS" & year == "2023"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, crop == "DB" & year == "2023"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, crop == "FC" & year == "2023"))
+
+```
+
+Comparing spring to fall, there is a significant difference -- but no interactions with treatment or crop. Data is normally distributed
+```{r}
+# there is a significant difference between spring and fall, there is not difference for treatments and crops
+aov <- aov(bc_p ~ treatment*crop*month, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+```
+Individual sampling events: ANOVA shows no difference between crops or treatments for each sampling event --- but data is not normally distributed for October. If I run KW tests, in May, there is almost a significant difference between treatments for collards (0.05). I will probably not count this to be honest. In October, KW tests show no significant difference for treatment or crop
+```{r}
+#Sampling #1
+aov <- aov(bc_p ~ treatment*crop, data = subset(soil_fert, year == "2023" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(bray_p_ppm ~ crop, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "AS"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "DB"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "FC"))
+dunnTest(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "FC"))
+
+#Sampling # 2
+aov <- aov(bc_p ~ treatment*crop, data = subset(soil_fert, year == "2023" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(bray_p_ppm ~ crop, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "AS"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "DB"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "FC"))
+
+```
+
+
+#### 2024
+For the whole year: There is no significant differences in soil P between treatments and crops (or their interactions). Data is not normally distributed, so ran KW tests, which back up this conclusion.
+```{r}
+aov <- aov(bc_p ~ treatment*crop, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, year == "2024"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, year == "2024"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, year == "2024"))
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, crop == "AS" & year == "2024"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, crop == "DB" & year == "2024"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, crop == "FC" & year == "2024"))
+
+```
+
+Comparing spring to fall, there is a significant difference -- and there might be a difference between BM and SM (0.06). Data is normally distributed
+```{r}
+# there is a significant difference between spring and fall, possible difference between treatments
+aov <- aov(bc_p ~ treatment*crop*month, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# which continues to linger when crop is removed
+aov <- aov(bc_p ~ treatment*month, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+```
+
+ANOVAs indicates that there's no difference between crop or treatments in May, but there is between BM and SM in October (which is probably where the overall year result is coming from). Saying that, if I run KW tests, there is no significant difference between treatments (BM-SM is 0.05) and I actually trust that more.
+```{r}
+#Sampling #3
+aov <- aov(bc_p ~ treatment*crop, data = subset(soil_fert, year == "2024" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(bray_p_ppm ~ crop, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "AS"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "DB"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "FC"))
+
+#Sampling # 4
+aov <- aov(bc_p ~ treatment*crop, data = subset(soil_fert, year == "2024" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024"))
+dunnTest(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(bray_p_ppm ~ crop, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "AS"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "DB"))
+kruskal.test(bray_p_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "FC"))
+
+```
+
+
+### Linear Mixed Model
+LMM backs up the difference between BM and SM in 2024
+```{r}
+model <- lmer(bc_p ~ treatment + (1 | month), data = subset(soil_fert, year == "2024"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
 ```
 
 ## Potassium
 
-### Visualization
+OKAY, while there is a significant difference between collards and strawberries/beans in 2024, the question I was actually interested in here was whether there was a difference between years, and there is not. When I check the descriptive statistics, the range is basically the same and, more importantly, the mean and sd are nearly the same when I summarize just by year. When I summarize by year and crop, that's where AS is clearly lower in 2024 and has a much smaller sd, but the crops...moved? So this could be an effect from the previous year. Anywho, I think what I feel comfortable with, because the means are so close, is calling this an artifact and just presenting soil K information in the initial soil data table
 
 ```{r}
+soil_fert %>% group_by(year) %>% summarize(min = min(k_ppm, na.rm = TRUE),
+                                           median = median(k_ppm, na.rm = TRUE),
+                                           mean = mean(k_ppm, na.rm = TRUE),
+                                           max = max(k_ppm, na.rm = TRUE),
+                                           sd = sd(k_ppm, na.rm = TRUE))
 
+soil_fert %>% group_by(year, crop) %>% summarize(min = min(k_ppm, na.rm = TRUE),
+                                                 median = median(k_ppm, na.rm = TRUE),
+                                                 mean = mean(k_ppm, na.rm = TRUE),
+                                                 max = max(k_ppm, na.rm = TRUE),
+                                                 sd = sd(k_ppm, na.rm = TRUE))
+
+```
+
+### Visualization
+
+The graph that most represents the results:
+```{r}
+# K overall for crop
+ggplot(soil_fert, aes(x = crop, y = k_ppm)) + geom_boxplot()
+
+```
+
+This figure breaks it down by treatment and crop, for consistency, but fundamentally shows the same thing
+```{r}
+# K overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = k_ppm, fill = treatment)) + geom_boxplot()
+
+```
+
+```{r}
+# K by sample date for each crop-treatment combination
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = k_ppm, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
+
+ggplot(soil_fert, aes(x = sample_date, y = k_ppm, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+# K by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = k_ppm, fill = treatment)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = k_ppm, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+# K by sample date for each crop
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = k_ppm, fill = crop)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = k_ppm, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# K by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = k_ppm)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = k_ppm)) + geom_point() + geom_smooth(method = lm)
+
+# K overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = k_ppm, fill = treatment)) + geom_boxplot()
+
+# K overall for treatment
+ggplot(soil_fert, aes(x = treatment, y = k_ppm)) + geom_boxplot()
 
 ```
 
 ### Normality
+Normally distributed!
 ```{r}
-
+hist(soil_fert$k_ppm)
+skewness(soil_fert$k_ppm, na.rm = TRUE)
+qqnorm(soil_fert$k_ppm, main='Normal')
+qqline(soil_fert$k_ppm)
+shapiro.test(soil_fert$k_ppm)
 ```
 
 ### ANOVA
+
 ```{r}
+# when I look at start and end together, there is a significant difference in soil K between crops which was...unexpected
+aov <- aov(k_ppm ~ treatment*crop*year, data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+# There are no significant differences between years for any treatment or crop 
+aov <- aov(k_ppm ~ year, data = subset(soil_fert, treatment == "BM"))
+summary(aov)
+
+aov <- aov(k_ppm ~ year, data = subset(soil_fert, treatment == "SM"))
+summary(aov)
+
+aov <- aov(k_ppm ~ year, data = subset(soil_fert, treatment == "CM"))
+summary(aov)
+
+aov <- aov(k_ppm ~ year, data = subset(soil_fert, crop == "AS"))
+summary(aov)
+
+aov <- aov(k_ppm ~ year, data = subset(soil_fert, crop == "DB"))
+summary(aov)
+
+aov <- aov(k_ppm ~ year, data = subset(soil_fert, crop == "FC"))
+summary(aov)
+
+## 2023: no significant differences in soil K for any treatment or crop
+aov <- aov(k_ppm ~ treatment*crop, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+# 2024: there is a significant difference between FC and AS, but not between treatments
+aov <- aov(k_ppm ~ treatment*crop, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+# 2024, more: within a treatment, there's not a significant difference between crops
+aov <- aov(k_ppm ~ crop, data = subset(soil_fert, year == "2024" & treatment == "BM"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+aov <- aov(k_ppm ~ crop, data = subset(soil_fert, year == "2024" & treatment == "SM"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+aov <- aov(k_ppm ~ crop, data = subset(soil_fert, year == "2024" & treatment == "CM"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+# trying something with unique plots
+aov <- aov(k_ppm ~ unique_ID, data = subset(soil_fert, block == 4))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
 
 ```
 
 ### Linear Mixed Model
+This shows that if you take block and/or unique ID into consideration, then FC is significantly different than both AS and DB (over both years, as is the current code, but also for 2024 specifically)
+
+RE - AIC
+block - 716
+unique ID - 713
+block/unique ID - 712
 ```{r}
+model <- lmer(k_ppm ~ crop + (1 | block), data = soil_fert)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ crop)
 
 ```
-
 
 ## Carbon
 
@@ -94,49 +572,356 @@ bd <- read.csv(here::here("00-data", "b-prepared",
 
 #### Visualization
 
+These are the ones that best reflect the analysis
 ```{r}
+# C by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_c_wt_pct, fill = treatment)) + geom_boxplot() 
 
+ggplot(soil_fert, aes(x = sample_date, y = total_c_wt_pct, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+# C by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_c_wt_pct)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_c_wt_pct)) + geom_point() + geom_smooth(method = lm)
+
+```
+
+```{r}
+# C by sample date for each crop-treatment combination
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_c_wt_pct, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_c_wt_pct, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+# C by sample date for each crop
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_c_wt_pct, fill = crop)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_c_wt_pct, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# C overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = total_c_wt_pct, fill = treatment)) + geom_boxplot()
+
+# C overall for treatment
+ggplot(soil_fert, aes(x = treatment, y = total_c_wt_pct)) + geom_boxplot()
+
+# C overall for crop
+ggplot(soil_fert, aes(x = crop, y = total_c_wt_pct)) + geom_boxplot()
+
+# C for 2023 by crop-treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = total_c_wt_pct, fill = treatment)) + geom_boxplot()
+
+# C for 2023 by treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = treatment, y = total_c_wt_pct)) + geom_boxplot()
+
+# C for 2023 by crop
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = total_c_wt_pct)) + geom_boxplot()
+
+
+# C for 2024 by crop-treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = total_c_wt_pct, fill = treatment)) + geom_boxplot()
+
+# C for 2024 by treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = treatment, y = total_c_wt_pct)) + geom_boxplot()
+
+# C for 2024 by crop
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = total_c_wt_pct)) + geom_boxplot()
 
 ```
 
 #### Normality
+Nearly normal to start with, definitely normal after transformation
 ```{r}
+hist(soil_fert$total_c_wt_pct)
+skewness(soil_fert$total_c_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert$total_c_wt_pct, main='Normal')
+qqline(soil_fert$total_c_wt_pct)
+shapiro.test(soil_fert$total_c_wt_pct)
+```
+
+```{r}
+bc <- boxcox(lm(soil_fert$total_c_wt_pct ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_c <- (soil_fert$total_c_wt_pct ^ lambda -1)/lambda
+
+hist(soil_fert$bc_c)
+skewness(soil_fert$bc_c, na.rm = TRUE)
+qqnorm(soil_fert$bc_c, main='Normal')
+qqline(soil_fert$bc_c)
+shapiro.test(soil_fert$bc_c)
 
 ```
 
+
 #### ANOVA
+
 ```{r}
+
+#overall, there doesn't seem to be a significant difference in C between years, crops, or treatments
+aov <- aov(bc_c ~ treatment*crop*year, data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+```
+
+Comparing the start and end of the experiment
+```{r}
+#ANOVA shows a significant difference between the start and end of the experiment, but that's across the board, not for a specific treatment/crop. The data doesn't appear to as normally distributed (LMM is...okay for this)
+aov <- aov(bc_c ~ treatment*year, data = subset(soil_fert, (month == "5" & year == "2023") | (month == "10" & year == "2024")))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# And just out of curiousity, I tried a different approach, which was calculating the change in C and seeing if there was a treatment effect, and there is not
+start_end_c <- soil_fert %>%
+               subset((month == "5" & year == "2023") | (month == "10" & year == "2024")) %>%
+               mutate(year = ifelse(year == "2023", "initial", "final")) %>%
+               dplyr::select(c(block, plot, treatment, total_c_wt_pct, year)) %>%
+               pivot_wider(names_from = 'year', values_from = "total_c_wt_pct") %>%
+               mutate(change = final - initial)
+
+hist(start_end_c$change)
+skewness(start_end_c$change, na.rm = TRUE)
+qqnorm(start_end_c$change, main='Normal')
+qqline(start_end_c$change)
+shapiro.test(start_end_c$change)
+
+aov <- aov(change ~ treatment, data = start_end_c)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+```
+
+#### 2023
+
+For the whole year: There is no significant differences in C between treatments and crops (or their interactions). Data is normally distributed, and KW tests back up this conclusion.
+```{r}
+aov <- aov(bc_c ~ treatment*crop, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, year == "2023"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, crop == "AS" & year == "2023"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, crop == "DB" & year == "2023"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, crop == "FC" & year == "2023"))
+
+```
+
+Comparing spring to fall, there is a significant difference -- but no interactions with treatment. When I limit to individual treatments (as KW, because the datasets get non-parametric), then there is an almost significant difference between months for BM specifically, but not SM or CM. Data is normally distributed
+```{r}
+# there is a significant difference between spring and fall, there is not difference for treatments and crops
+aov <- aov(bc_c ~ treatment*month, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_c_wt_pct ~ month, data = subset(soil_fert, year == "2023" & treatment == "BM"))
+kruskal.test(total_c_wt_pct ~ month, data = subset(soil_fert, year == "2023" & treatment == "SM"))
+kruskal.test(total_c_wt_pct ~ month, data = subset(soil_fert, year == "2023" & treatment == "CM"))
+```
+Individual sampling events: ANOVA shows no difference between crops or treatments for each sampling event. Ran KW tests for May, though the data looked normally distributed. Ran KW tests for October because the data is non-parametric. Both back up no significant difference between treatments
+```{r}
+#Sampling #1
+aov <- aov(bc_c ~ treatment, data = subset(soil_fert, year == "2023" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(total_c_wt_pct ~ crop, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "AS"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "DB"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "FC"))
+
+#Sampling # 2
+aov <- aov(bc_c ~ treatment, data = subset(soil_fert, year == "2023" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(total_c_wt_pct ~ crop, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "AS"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "DB"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "FC"))
+
+```
+
+
+#### 2024
+For the whole year: There is no significant differences in C between treatments and crops (or their interactions). 
+```{r}
+aov <- aov(bc_c ~ treatment*crop, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, year == "2024"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, crop == "AS" & year == "2024"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, crop == "DB" & year == "2024"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, crop == "FC" & year == "2024"))
+
+```
+
+Comparing spring to fall, there is a significant difference. 
+```{r}
+# there is a significant difference between spring and fall, possible difference between treatments
+aov <- aov(total_c_wt_pct ~ treatment*month, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+```
+
+ANOVAs indicates that there's no difference between crop or treatments in May or October. Noting that I can likely use the original dataset occasionally.
+```{r}
+#Sampling #3
+aov <- aov(bc_c ~ treatment, data = subset(soil_fert, year == "2024" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(total_c_wt_pct ~ crop, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "AS"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "DB"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "FC"))
+
+#Sampling # 4
+aov <- aov(total_c_wt_pct ~ treatment, data = subset(soil_fert, year == "2024" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(total_c_wt_pct ~ crop, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "AS"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "DB"))
+kruskal.test(total_c_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "FC"))
 
 ```
 
 #### Linear Mixed Model
+
 ```{r}
 
+model <- lmer(change ~ treatment + (1 | block), data = start_end_c)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
 ```
 
 ### Bulk Density
+BD in 2024 is significantly higher than 2023; this trend is the same for all mulch treatments. The BD for bare soil trends slightly higher than for mulch treatments. I'm not considering crop, because for soil properties, since we rotated crops, it feels a little weird.
 
 #### Visualization
 
+This is the most relevant visualization for the analysis
 ```{r}
+# BD by sample date - the only significant result
+ggplot(bd, aes(x = as.factor(year), y = bulk_density)) + geom_boxplot() 
+
+ggplot(bd, aes(x = year, y = bulk_density)) + geom_point() + geom_smooth(method = lm)
+
+# BD by sample date for each treatment - the main thing we're actually interested in
+ggplot(bd, aes(x = as.factor(year), y = bulk_density, fill = treatment)) + geom_boxplot() 
+
+ggplot(bd, aes(x = year, y = bulk_density, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+
+```
+
+```{r}
+# BD by sample date for each crop-treatment combination
+ggplot(bd, aes(x = as.factor(year), y = bulk_density, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
+
+ggplot(bd, aes(x = year, y = bulk_density, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+# BD by sample date for each crop
+ggplot(bd, aes(x = as.factor(year), y = bulk_density, fill = crop)) + geom_boxplot() 
+
+ggplot(bd, aes(x = year, y = bulk_density, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# BD overall for crop-treatment
+ggplot(bd, aes(x = crop, y = bulk_density, fill = treatment)) + geom_boxplot()
+
+# BD overall for treatment
+ggplot(bd, aes(x = treatment, y = bulk_density)) + geom_boxplot()
+
+# BD overall for crop
+ggplot(bd, aes(x = crop, y = bulk_density)) + geom_boxplot()
 
 
 ```
 
 #### Normality
+Not normally distributed
 ```{r}
+hist(bd$bulk_density)
+skewness(bd$bulk_density, na.rm = TRUE)
+qqnorm(bd$bulk_density, main='Normal')
+qqline(bd$bulk_density)
+shapiro.test(bd$bulk_density)
+```
+
+
+#### Kruskal-wallis
+
+```{r}
+#there is a significant different between study years, but not between treatments and crops
+kruskal.test(bulk_density ~ treatment, data = bd)
+kruskal.test(bulk_density ~ crop, data = bd)
+
+kruskal.test(bulk_density ~ year, data = bd)
+kruskal.test(bulk_density ~ year, data = subset(bd, treatment == "BM"))
+kruskal.test(bulk_density ~ year, data = subset(bd, treatment == "SM"))
+kruskal.test(bulk_density ~ year, data = subset(bd, treatment == "CM"))
+
+#there is not a significant difference between treatments or crops in 2023, nor is there a difference between crops within treatments
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2023"))
+kruskal.test(bulk_density ~ crop, data = subset(bd, year == "2023"))
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2023" & crop == "AS"))
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2023" & crop == "DB"))
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2023" & crop == "FC"))
+
+#there is not a significant difference between treatments or crops in 2024, nor is there a difference between crops within treatments (though we get close to a significant treatment difference within DB)
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2024"))
+kruskal.test(bulk_density ~ crop, data = subset(bd, year == "2024"))
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2024" & crop == "AS"))
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2024" & crop == "DB"))
+kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2024" & crop == "FC"))
 
 ```
 
-#### ANOVA
-```{r}
-
-```
-
-#### Linear Mixed Model
-```{r}
-
-```
 
 ## Nitrogen
 
@@ -144,23 +929,338 @@ bd <- read.csv(here::here("00-data", "b-prepared",
 
 #### Visualization
 
+Probably the most relevant visualizations:
 ```{r}
+# NO3 by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NO3_ppm, fill = treatment)) + geom_boxplot() 
 
+ggplot(soil_fert, aes(x = sample_date, y = NO3_ppm, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+```
+
+```{r}
+# NO3 by sample date for each crop-treatment combination
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NO3_ppm, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
+
+ggplot(soil_fert, aes(x = sample_date, y = NO3_ppm, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+
+# NO3 by sample date for each crop
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NO3_ppm, fill = crop)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = NO3_ppm, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# NO3 by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NO3_ppm)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = NO3_ppm)) + geom_point() + geom_smooth(method = lm)
+
+# NO3 overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = NO3_ppm, fill = treatment)) + geom_boxplot()
+
+# NO3 overall for treatment
+ggplot(soil_fert, aes(x = treatment, y = NO3_ppm)) + geom_boxplot()
+
+# NO3 overall for crop
+ggplot(soil_fert, aes(x = crop, y = NO3_ppm)) + geom_boxplot()
+
+# NO3 for 2023 by crop-treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = NO3_ppm, fill = treatment)) + geom_boxplot()
+
+# NO3 for 2023 by treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = treatment, y = NO3_ppm)) + geom_boxplot()
+
+# NO3 for 2023 by crop
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = NO3_ppm)) + geom_boxplot()
+
+
+# NO3 for 2024 by crop-treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = NO3_ppm, fill = treatment)) + geom_boxplot()
+
+# NO3 for 2024 by treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = treatment, y = NO3_ppm)) + geom_boxplot()
+
+# NO3 for 2024 by crop
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = NO3_ppm)) + geom_boxplot()
 
 ```
 
 #### Normality
+Transformation gets closer to normal distribution, but still not normal
 ```{r}
+hist(soil_fert$NO3_ppm)
+skewness(soil_fert$NO3_ppm, na.rm = TRUE)
+qqnorm(soil_fert$NO3_ppm, main='Normal')
+qqline(soil_fert$NO3_ppm)
+shapiro.test(soil_fert$NO3_ppm)
+```
+
+```{r}
+bc <- boxcox(lm(soil_fert$NO3_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_NO3 <- (soil_fert$NO3_ppm ^ lambda -1)/lambda
+
+hist(soil_fert$bc_NO3)
+skewness(soil_fert$bc_NO3, na.rm = TRUE)
+qqnorm(soil_fert$bc_NO3, main='Normal')
+qqline(soil_fert$bc_NO3)
+shapiro.test(soil_fert$bc_NO3)
 
 ```
 
-#### ANOVA
+#### Kruskal-Wallis
+
 ```{r}
+# not normally distributed
+aov <- aov(bc_NO3 ~ treatment*year, data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#there is a significant different between study years, but not between treatments and crops. 
+kruskal.test(NO3_ppm ~ treatment, data = soil_fert)
+kruskal.test(NO3_ppm ~ crop, data = soil_fert)
+
+kruskal.test(NO3_ppm ~ year, data = soil_fert)
+kruskal.test(NO3_ppm ~ year, data = subset(soil_fert, treatment == "BM"))
+kruskal.test(NO3_ppm ~ year, data = subset(soil_fert, treatment == "SM"))
+kruskal.test(NO3_ppm ~ year, data = subset(soil_fert, treatment == "CM"))
+
+
+# there might be a significant difference between fall and spring, but it's non-parametric. All dates are significantly different from each other EXCEPT 7/19/2023 and Oct 2023, 6/20/24 and 7/10/2024 + 10/17/2024, and 7/10/2024 + 10/17/2024 
+aov <- aov(bc_NO3 ~ treatment*as.factor(sample_date), data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# For all nitrate samples, there is a significant difference between many dates (but not all)
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = soil_fert)
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = soil_fert)
+
+# There is a signifcant difference between many dates (but not all)
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "BM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "BM"))
+
+# There is a signifcant difference between many dates (but not all)
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "SM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "SM"))
+
+# There is a signifcant difference between many dates (but not all)
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "CM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "CM"))
+```
+
+#### 2023
+```{r}
+# not a normal distribution
+aov <- aov(bc_NO3 ~ treatment, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+#there is not a significant difference between treatments or crops in 2023, nor is there a difference between crops within treatments
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2023"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, year == "2023"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2023" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2023" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2023" & crop == "FC"))
+
+
 
 ```
 
-#### Linear Mixed Model
+Comparing the sample dates, overall, there is a significant difference between 7/19 and october. Individual treatments have slightly different relationships
 ```{r}
+# there is a significant difference between all sample dates EXCEPT 7/19 and October
+aov <- aov(bc_NO3 ~ treatment*as.factor(sample_date), data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#Bare soil: there is a significant difference between 5/23 and all other dates. 7/5 is not significantly different from 7/19, but is from 10/2. 7/19 is not significantly different from 10/2
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "BM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "BM"))
+
+# Straw: All dates are significantly different from each other, except for 7/19 and 10/2 
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "SM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "SM"))
+
+# Cardboard: there is a significant difference between 5/23 and all other dates. There is not a significant difference between other dates.
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "CM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "CM"))
+
+```
+
+
+
+Individual sampling events: things get weird and complex in here
+```{r}
+#Sampling #1: mostly normal distribution with a couple outliers. no significant difference between treatments from both ANOVA and KW
+aov <- aov(bc_NO3 ~ treatment*crop, data = subset(soil_fert, year == "2023" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "FC"))
+
+#Sampling #2: mostly normal distribution with a couple outliers. If I run it as just treatment, there's a not quite a significant difference between SM and CM. If I run it with treatment/crop, treatment, crop, and their interactions all have an effect. Specifically, CM is significantly different than SM and is nearly significantly different from BM. Strawberries are significantly different. There are also some interaction effects 
+aov <- aov(bc_NO3 ~ treatment*crop, data = subset(soil_fert, sample_date == "2023-07-05"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# The only significant difference is between cardboard and straw for collards
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, sample_date == "2023-07-05"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05" & crop == "DB"))
+
+
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05" & crop == "FC"))
+dunnTest(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05" & crop == "FC"))
+
+#Sampling #3: not normally distributed. When I run with just treatment, there is a not quite significant different between BM and CM. When I run with treament/crop, there is a significant difference between bare soil and both mulches, and between beans and AS / FC. There are a smattering of interaction effects, though overall it isn't significant
+aov <- aov(bc_NO3 ~ treatment*crop, data = subset(soil_fert, sample_date == "2023-07-19"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# there is a significant difference between DB and FC
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, sample_date == "2023-07-19"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19" & crop == "FC"))
+
+#Sampling # 4: not a normal distribution. no significant differences between treatments, for both treatment alone and for treatment*crop. affirmed by KW
+aov <- aov(bc_NO3 ~ treatment*crop, data = subset(soil_fert, year == "2023" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "FC"))
+
+```
+#### 2024
+```{r}
+# not a normal distribution
+aov <- aov(bc_NO3 ~ treatment, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+#there is not a significant difference between treatments or crops, nor is there a difference between crops within treatments
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2024"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, year == "2024"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "FC"))
+
+
+
+```
+
+Comparing the sample dates, overall, there is a significant difference between 5/23 and all other sampling dates.
+```{r}
+# non-parametric distribution. Appears like 5/23 is significantly different from all other sampling dates, but that treatments on 5/23 are not significantly different from each other
+aov <- aov(bc_NO3 ~ treatment*as.factor(sample_date), data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#Bare soil: 5/23 is significantly different from all other dates
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "BM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "BM"))
+
+# Straw: 5/23 is significantly different from all other dates 
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "SM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "SM"))
+
+# Cardboard: 5/23 is significantly different from all other dates
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "CM"))
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "CM"))
+
+```
+
+
+
+Individual sampling events: there's no significant difference between crops until 7/10, and not until october for treatment
+```{r}
+#Sampling #1: normal distribution for treatment alone. non-parametric distribution for treatment*crop. no significant difference between treatments either way
+aov <- aov(bc_NO3 ~ treatment, data = subset(soil_fert, year == "2024" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "FC"))
+
+#Sampling #2: mostly normal distribution if just for treatment. non-parametric distribution for treatment*crop. no significant differences regardless
+aov <- aov(bc_NO3 ~ treatment*crop, data = subset(soil_fert, sample_date == "2024-06-20"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, sample_date == "2024-06-20"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20" & crop == "FC"))
+
+#Sampling #3: mostly normal distribution. If ANOVA for treatment alone, no significant difference. If for treatment*crop, then FC significantly different from DB/AS in ANOVA, only with DB in KW.
+aov <- aov(bc_NO3 ~ treatment*crop, data = subset(soil_fert, sample_date == "2024-07-10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# there is a significant difference between DB and FC
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, sample_date == "2024-07-10"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10" & crop == "FC"))
+
+#Sampling # 4: normal distribution. if considering treatment alone, no significant differences. If treatment*crop, then significant difference between BM and CM
+aov <- aov(bc_NO3 ~ treatment*crop, data = subset(soil_fert, year == "2024" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# it appears that the ANOVA finding is mostly coming from a difference between BM and CM for DB
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(NO3_ppm ~ crop, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "AS"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "DB"))
+dunnTest(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "DB"))
+kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "FC"))
 
 ```
 
@@ -169,22 +1269,336 @@ bd <- read.csv(here::here("00-data", "b-prepared",
 #### Visualization
 
 ```{r}
+# NH4 by sample date for each crop-treatment combination
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NH4_ppm, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
 
+ggplot(soil_fert, aes(x = sample_date, y = NH4_ppm, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+# NH4 by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NH4_ppm, fill = treatment)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = NH4_ppm, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+# NH4 by sample date for each crop
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NH4_ppm, fill = crop)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = NH4_ppm, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# NH4 by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = NH4_ppm)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = NH4_ppm)) + geom_point() + geom_smooth(method = lm)
+
+# NH4 overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = NH4_ppm, fill = treatment)) + geom_boxplot()
+
+# NH4 overall for treatment
+ggplot(soil_fert, aes(x = treatment, y = NH4_ppm)) + geom_boxplot()
+
+# NH4 overall for crop
+ggplot(soil_fert, aes(x = crop, y = NH4_ppm)) + geom_boxplot()
+
+# NH4 for 2023 by crop-treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = NH4_ppm, fill = treatment)) + geom_boxplot()
+
+# NH4 for 2023 by treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = treatment, y = NH4_ppm)) + geom_boxplot()
+
+# NH4 for 2023 by crop
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = NH4_ppm)) + geom_boxplot()
+
+
+# NH4 for 2024 by crop-treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = NH4_ppm, fill = treatment)) + geom_boxplot()
+
+# NH4 for 2024 by treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = treatment, y = NH4_ppm)) + geom_boxplot()
+
+# NH4 for 2024 by crop
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = NH4_ppm)) + geom_boxplot()
 
 ```
 
 #### Normality
+Transformation gets the distribution closer to normal, but still not normally distributed
 ```{r}
+hist(soil_fert$NH4_ppm)
+skewness(soil_fert$NH4_ppm, na.rm = TRUE)
+qqnorm(soil_fert$NH4_ppm, main='Normal')
+qqline(soil_fert$NH4_ppm)
+shapiro.test(soil_fert$NH4_ppm)
+```
+
+```{r}
+bc <- boxcox(lm(soil_fert$NH4_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_NH4 <- (soil_fert$NH4_ppm ^ lambda -1)/lambda
+
+hist(soil_fert$bc_NH4)
+skewness(soil_fert$bc_NH4, na.rm = TRUE)
+qqnorm(soil_fert$bc_NH4, main='Normal')
+qqline(soil_fert$bc_NH4)
+shapiro.test(soil_fert$bc_NH4)
 
 ```
 
-#### ANOVA
+#### Kruskal-Wallis
+
 ```{r}
+# close to normal distribution. no significant differences, regardless of whether or not crop is included
+aov <- aov(bc_NH4 ~ treatment*year, data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#there is nearly a significant difference between BM and SM 
+kruskal.test(NH4_ppm ~ treatment, data = soil_fert)
+dunnTest(NH4_ppm ~ treatment, data = soil_fert)
+
+kruskal.test(NH4_ppm ~ crop, data = soil_fert)
+
+#there is a significant difference between years, specifically for bare soil
+kruskal.test(NH4_ppm ~ year, data = soil_fert)
+kruskal.test(NH4_ppm ~ year, data = subset(soil_fert, treatment == "BM"))
+kruskal.test(NH4_ppm ~ year, data = subset(soil_fert, treatment == "SM"))
+kruskal.test(NH4_ppm ~ year, data = subset(soil_fert, treatment == "CM"))
+
+
+# non-parametric. Many dates are significantly different. BM and SM are almost significantly different
+aov <- aov(bc_NH4 ~ treatment*crop*as.factor(sample_date), data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# For all nitrate samples, there is a significant difference between many dates (but not all)
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = soil_fert)
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = soil_fert)
+
+# There is a signifcant difference between many dates (but not all)
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "BM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "BM"))
+
+# There is a signifcant difference between many dates (but not all)
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "SM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "SM"))
+
+# There is a signifcant difference between many dates (but not all)
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "CM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, treatment == "CM"))
+```
+
+#### 2023
+
+No significant differences across the whole year
+```{r}
+# nearly a normal distribution
+aov <- aov(bc_NH4 ~ treatment, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+#there is not a significant difference between treatments or crops in 2023, nor is there a difference between crops within treatments
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2023"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, year == "2023"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2023" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2023" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2023" & crop == "FC"))
+
+
 
 ```
 
-#### Linear Mixed Model
+Comparing the sample dates, 
 ```{r}
+# there is a significant difference between several date
+aov <- aov(bc_NH4 ~ treatment*as.factor(sample_date), data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#Bare soil: there are significant differences between dates
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "BM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "BM"))
+
+# Straw: there are significant differences between dates 
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "SM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "SM"))
+
+# Cardboard: there are significant differences between dates
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "CM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2023" & treatment == "CM"))
+
+```
+
+
+
+Individual sampling events: no significant differences
+```{r}
+#Sampling #1: mostly normal distribution. no significant differences between treatments or crops
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, year == "2023" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "FC"))
+
+#Sampling #2: mostly normal distribution with a couple outliers. no significant differences
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, sample_date == "2023-07-05"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, sample_date == "2023-07-05"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-05" & crop == "FC"))
+
+#Sampling #3: mostly normal distribution. no significant differences
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, sample_date == "2023-07-19"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, sample_date == "2023-07-19"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2023-07-19" & crop == "FC"))
+
+#Sampling # 4: mostly normal distribution. no significant differences
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, year == "2023" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "FC"))
+
+```
+
+#### 2024
+```{r}
+# not a normal distribution. significant difference between bare soil and mulches
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+#significant difference between bare soil and mulches overall. For AS, difference between BM and CM
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2024"))
+dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2024"))
+
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, year == "2024"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "AS"))
+dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "FC"))
+dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert, year == "2024" & crop == "FC"))
+
+
+```
+
+Comparing the sample dates, 
+```{r}
+# non-parametric. BM is significantly different than mulches. june and july / july and october are significantly different.
+aov <- aov(bc_NH4 ~ treatment*crop*as.factor(sample_date), data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#Bare soil: no significant differences between dates
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "BM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "BM"))
+
+# Straw: no significant differences between dates
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "SM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "SM"))
+
+# Cardboard: no significant differences between dates
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "CM"))
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = subset(soil_fert, year == "2024" & treatment == "CM"))
+
+```
+
+
+
+Individual sampling events: only significant differences for June
+```{r}
+#Sampling #1: non-parametric. no significant differences between treatments or crops
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, year == "2024" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "FC"))
+
+#Sampling #2: normal distribution. BM is significantly different from mulches according to ANOVA and KW. If we consider crops individually, there is a difference between BM and CM for FC.
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, sample_date == "2024-06-20"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20"))
+dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, sample_date == "2024-06-20"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20" & crop == "FC"))
+dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-06-20" & crop == "FC"))
+
+#Sampling #3: mostly normal distribution. no significant differences
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, sample_date == "2024-07-10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, sample_date == "2024-07-10"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, sample_date == "2024-07-10" & crop == "FC"))
+
+#Sampling # 4: mostly normal distribution. no significant differences
+aov <- aov(bc_NH4 ~ treatment*crop, data = subset(soil_fert, year == "2023" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(NH4_ppm ~ crop, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "AS"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "DB"))
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "FC"))
 
 ```
 
@@ -192,23 +1606,257 @@ bd <- read.csv(here::here("00-data", "b-prepared",
 
 #### Visualization
 
+These are the most relevant visualizations
 ```{r}
+# N by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_n_wt_pct, fill = treatment)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_n_wt_pct, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+# N by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_n_wt_pct)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_n_wt_pct)) + geom_point() + geom_smooth(method = lm)
+
+```
+
+```{r}
+
+# N by sample date for each crop-treatment combination
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_n_wt_pct, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_n_wt_pct, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+# N by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_n_wt_pct, fill = treatment)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_n_wt_pct, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+# N by sample date for each crop
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_n_wt_pct, fill = crop)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_n_wt_pct, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# N by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = total_n_wt_pct)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = total_n_wt_pct)) + geom_point() + geom_smooth(method = lm)
+
+# N overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = total_n_wt_pct, fill = treatment)) + geom_boxplot()
+
+# N overall for treatment
+ggplot(soil_fert, aes(x = treatment, y = total_n_wt_pct)) + geom_boxplot()
+
+# N overall for crop
+ggplot(soil_fert, aes(x = crop, y = total_n_wt_pct)) + geom_boxplot()
+
+# N for 2023 by crop-treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = total_n_wt_pct, fill = treatment)) + geom_boxplot()
+
+# N for 2023 by treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = treatment, y = total_n_wt_pct)) + geom_boxplot()
+
+# N for 2023 by crop
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = total_n_wt_pct)) + geom_boxplot()
+
+
+# N for 2024 by crop-treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = total_n_wt_pct, fill = treatment)) + geom_boxplot()
+
+# N for 2024 by treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = treatment, y = total_n_wt_pct)) + geom_boxplot()
+
+# N for 2024 by crop
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = total_n_wt_pct)) + geom_boxplot()
+
 
 
 ```
 
 #### Normality
+Not normally distributed, and transformation doesn't seem to help much
 ```{r}
+hist(soil_fert$total_n_wt_pct)
+skewness(soil_fert$total_n_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert$total_n_wt_pct, main='Normal')
+qqline(soil_fert$total_n_wt_pct)
+shapiro.test(soil_fert$total_n_wt_pct)
 
 ```
 
-#### ANOVA
 ```{r}
+bc <- boxcox(lm(soil_fert$total_n_wt_pct ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_n <- (soil_fert$total_n_wt_pct ^ lambda -1)/lambda
+
+hist(soil_fert$bc_n)
+skewness(soil_fert$bc_n, na.rm = TRUE)
+qqnorm(soil_fert$bc_n, main='Normal')
+qqline(soil_fert$bc_n)
+shapiro.test(soil_fert$bc_n)
 
 ```
 
-#### Linear Mixed Model
+#### Kruskal-Wallis
+
 ```{r}
+#there is a significant different between study years, but not between treatments and crops. 
+
+kruskal.test(total_n_wt_pct ~ treatment, data = soil_fert)
+kruskal.test(total_n_wt_pct ~ crop, data = soil_fert)
+
+kruskal.test(total_n_wt_pct ~ year, data = soil_fert)
+kruskal.test(total_n_wt_pct ~ year, data = subset(soil_fert, treatment == "BM"))
+kruskal.test(total_n_wt_pct ~ year, data = subset(soil_fert, treatment == "SM"))
+kruskal.test(total_n_wt_pct ~ year, data = subset(soil_fert, treatment == "CM"))
+
+```
+
+##### 2023
+
+Overall, there is not a significant difference between treatments or crops
+```{r}
+# data is normally distributed
+aov <- aov(total_n_wt_pct ~ treatment*crop, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+#there is not a significant difference between treatments or crops in 2023, nor is there a difference between crops within treatments
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023"))
+kruskal.test(cn_ratio ~ crop, data = subset(soil_fert, year == "2023"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & crop == "AS"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & crop == "DB"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & crop == "FC"))
+
+```
+
+Comparing spring to fall, there is a significant difference -- but no interactions with treatment. When I limit to individual treatments (as KW, because the datasets get non-parametric), then there is a significant difference between each treatment from one month to the next
+```{r}
+# there is a significant difference between spring and fall, there is not difference for treatments and crops
+aov <- aov(total_n_wt_pct ~ treatment*month, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, year == "2023" & treatment == "BM"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, year == "2023" & treatment == "SM"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, year == "2023" & treatment == "CM"))
+```
+Comparing fall 2023 to spring 2024, there is not a significant difference
+```{r}
+# doesn't seem to be a difference between fall and spring, but it's non-parametric 
+aov <- aov(total_n_wt_pct ~ treatment*month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#there is not a difference between spring and fall
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01" & treatment == "BM"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01" & treatment == "SM"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01" & treatment == "CM"))
+```
+
+
+Individual sampling events: ANOVA shows no difference between crops or treatments for each sampling event, and they seem non-parametric. Affirmed by KW tests. 
+```{r}
+#Sampling #1
+aov <- aov(total_n_wt_pct ~ treatment, data = subset(soil_fert, year == "2023" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(total_n_wt_pct ~ crop, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "AS"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "DB"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "FC"))
+
+#Sampling # 2
+aov <- aov(total_n_wt_pct ~ treatment, data = subset(soil_fert, year == "2023" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(total_n_wt_pct ~ crop, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "AS"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "DB"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "FC"))
+
+```
+
+#### 2024
+For the whole year: There is no significant differences in CN ratio between treatments and crops (or their interactions). Affirmed by KW
+```{r}
+# normally distributed
+aov <- aov(total_n_wt_pct ~ treatment*crop, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, year == "2024"))
+kruskal.test(total_n_wt_pct ~ crop, data = subset(soil_fert, year == "2024"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, crop == "AS" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, crop == "DB" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, crop == "FC" & year == "2024"))
+
+```
+
+Comparing spring to fall, there is not asignificant difference. 
+```{r}
+# normally distributed
+aov <- aov(total_n_wt_pct ~ treatment*month, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, year == "2024"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, treatment == "BM" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, treatment == "SM" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ month, data = subset(soil_fert, treatment == "CM" & year == "2024"))
+
+```
+
+ANOVAs indicates that there's no difference between crop or treatments in May or October, but they're non-parametric. KW's affirm there is no difference
+```{r}
+#Sampling #3 - ANOVA not normally distributed
+aov <- aov(total_n_wt_pct ~ treatment, data = subset(soil_fert, year == "2024" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ crop, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "AS"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "DB"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "FC"))
+
+#Sampling # 4 - data seems normally distributed
+aov <- aov(total_n_wt_pct ~ treatment*crop, data = subset(soil_fert, year == "2024" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# there's a significant difference between AS and DB (0.05), but again, I don't trust the crop differences for this
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ crop, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "AS"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "DB"))
+kruskal.test(total_n_wt_pct ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "FC"))
 
 ```
 
@@ -222,41 +1870,266 @@ bd <- read.csv(here::here("00-data", "b-prepared",
 ```
 
 #### Normality
+
 ```{r}
 
 ```
 
 #### ANOVA
+
 ```{r}
 
 ```
 
 #### Linear Mixed Model
+
 ```{r}
 
 ```
-
 
 ## C:N Ratio
 
 ### Visualization
 
+These are the visualizations that are most representative of the results:
 ```{r}
 
+# C:N by sample date for each treatment
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = cn_ratio, fill = treatment)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = cn_ratio, color = treatment)) + geom_point() + geom_smooth(method = lm)
+
+# C:N by sample date
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = cn_ratio)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = cn_ratio)) + geom_point() + geom_smooth(method = lm)
+
+
+```
+
+```{r}
+# C:N by sample date for each crop-treatment combination
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = cn_ratio, fill = treatment)) + geom_boxplot() + facet_wrap(~crop) 
+
+ggplot(soil_fert, aes(x = sample_date, y = cn_ratio, color = treatment)) + geom_point() + facet_wrap(~crop) + geom_smooth(method = lm)
+
+# C:N by sample date for each crop
+ggplot(soil_fert, aes(x = as.factor(sample_date), y = cn_ratio, fill = crop)) + geom_boxplot() 
+
+ggplot(soil_fert, aes(x = sample_date, y = cn_ratio, color = crop)) + geom_point() + geom_smooth(method = lm)
+
+# C:N overall for crop-treatment
+ggplot(soil_fert, aes(x = crop, y = cn_ratio, fill = treatment)) + geom_boxplot()
+
+# C:N overall for treatment
+ggplot(soil_fert, aes(x = treatment, y = cn_ratio)) + geom_boxplot()
+
+# C:N overall for crop
+ggplot(soil_fert, aes(x = crop, y = cn_ratio)) + geom_boxplot()
+
+# C:N for 2023 by crop-treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = cn_ratio, fill = treatment)) + geom_boxplot()
+
+# C:N for 2023 by treatment
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = treatment, y = cn_ratio)) + geom_boxplot()
+
+# C:N for 2023 by crop
+ggplot(subset(soil_fert, sample_date < "2023-12-31"), aes(x = crop, y = cn_ratio)) + geom_boxplot()
+
+
+# C:N for 2024 by crop-treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = cn_ratio, fill = treatment)) + geom_boxplot()
+
+# C:N for 2024 by treatment
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = treatment, y = cn_ratio)) + geom_boxplot()
+
+# C:N for 2024 by crop
+ggplot(subset(soil_fert, sample_date > "2023-12-31"), aes(x = crop, y = cn_ratio)) + geom_boxplot()
 
 ```
 
 ### Normality
+It is not normally distributed, and transformation doesn't help
 ```{r}
+hist(soil_fert$cn_ratio)
+skewness(soil_fert$cn_ratio, na.rm = TRUE)
+qqnorm(soil_fert$cn_ratio, main='Normal')
+qqline(soil_fert$cn_ratio)
+shapiro.test(soil_fert$cn_ratio)
+```
+
+
+```{r}
+bc <- boxcox(lm(soil_fert$cn_ratio ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_cn <- (soil_fert$cn_ratio ^ lambda -1)/lambda
+
+hist(soil_fert$bc_cn)
+skewness(soil_fert$bc_cn, na.rm = TRUE)
+qqnorm(soil_fert$bc_cn, main='Normal')
+qqline(soil_fert$bc_cn)
+shapiro.test(soil_fert$bc_cn)
 
 ```
 
-### ANOVA
+### Kruskal-Wallis
+
 ```{r}
+#there is a significant different between study years, but not between treatments and crops. 
+
+kruskal.test(cn_ratio ~ treatment, data = soil_fert)
+kruskal.test(cn_ratio ~ crop, data = soil_fert)
+
+kruskal.test(cn_ratio ~ year, data = soil_fert)
+kruskal.test(cn_ratio ~ year, data = subset(soil_fert, treatment == "BM"))
+kruskal.test(cn_ratio ~ year, data = subset(soil_fert, treatment == "SM"))
+kruskal.test(cn_ratio ~ year, data = subset(soil_fert, treatment == "CM"))
+
 
 ```
 
-### Linear Mixed Model
+#### 2023
 ```{r}
+# data is close to a normal distribution according to residual plots when we just look at 2023. There is no significant difference between treatments
+aov <- aov(cn_ratio ~ treatment*crop, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+#there is not a significant difference between treatments or crops in 2023, nor is there a difference between crops within treatments
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023"))
+kruskal.test(cn_ratio ~ crop, data = subset(soil_fert, year == "2023"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & crop == "AS"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & crop == "DB"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & crop == "FC"))
+
+```
+
+Comparing spring to fall, there is a significant difference -- but no interactions with treatment. When I limit to individual treatments (as KW, because the datasets get non-parametric), then there is a significant difference between each treatment from one month to the next
+```{r}
+# there is a significant difference between spring and fall, there is not difference for treatments and crops
+aov <- aov(cn_ratio ~ treatment*month, data = subset(soil_fert, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, year == "2023" & treatment == "BM"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, year == "2023" & treatment == "SM"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, year == "2023" & treatment == "CM"))
+```
+Comparing fall 2023 to spring 2024,
+```{r}
+# there might be a significant difference between fall and spring, but it's non-parametric so
+aov <- aov(cn_ratio ~ treatment*month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#there is a difference between spring and fall -- and we can attribute it to bare soil
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01" & treatment == "BM"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01" & treatment == "SM"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, sample_date > "2023-10-01" & sample_date < "2024-06-01" & treatment == "CM"))
+```
+
+
+Individual sampling events: ANOVA shows no difference between crops or treatments for each sampling event, but they are non-parametric. Affirmed by KW tests. 
+```{r}
+#Sampling #1
+aov <- aov(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(cn_ratio ~ crop, data = subset(soil_fert, month == "5" & year == "2023"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "AS"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "DB"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2023" & crop == "FC"))
+
+#Sampling # 2
+aov <- aov(cn_ratio ~ treatment, data = subset(soil_fert, year == "2023" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(cn_ratio ~ crop, data = subset(soil_fert, month == "10" & year == "2023"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "AS"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "DB"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2023" & crop == "FC"))
+
+```
+
+#### 2024
+For the whole year: There is no significant differences in CN ratio between treatments and crops (or their interactions). Affirmed by KW
+```{r}
+# not normally distributed
+aov <- aov(cn_ratio ~ treatment*crop, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, year == "2024"))
+kruskal.test(cn_ratio ~ crop, data = subset(soil_fert, year == "2024"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, crop == "AS" & year == "2024"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, crop == "DB" & year == "2024"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, crop == "FC" & year == "2024"))
+
+```
+
+Comparing spring to fall, there is a significant difference. 
+```{r}
+# there is a significant difference between spring and fall
+aov <- aov(cn_ratio ~ treatment*month, data = subset(soil_fert, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, year == "2024"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, treatment == "BM" & year == "2024"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, treatment == "SM" & year == "2024"))
+kruskal.test(cn_ratio ~ month, data = subset(soil_fert, treatment == "CM" & year == "2024"))
+
+```
+
+ANOVAs indicates that there's no difference between crop or treatments in May or October, and they're mostly normally distributed. 
+```{r}
+#Sampling #3
+aov <- aov(cn_ratio ~ treatment, data = subset(soil_fert, year == "2024" & month == "5"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(cn_ratio ~ crop, data = subset(soil_fert, month == "5" & year == "2024"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "AS"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "DB"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "5" & year == "2024" & crop == "FC"))
+
+#Sampling # 4
+aov <- aov(cn_ratio ~ treatment*crop, data = subset(soil_fert, year == "2024" & month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# there's a significant difference between AS and DB (0.05), but again, I don't trust the crop differences for this
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(cn_ratio ~ crop, data = subset(soil_fert, month == "10" & year == "2024"))
+dunnTest(cn_ratio ~ crop, data = subset(soil_fert, month == "10" & year == "2024"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "AS"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "DB"))
+kruskal.test(cn_ratio ~ treatment, data = subset(soil_fert, month == "10" & year == "2024" & crop == "FC"))
 
 ```
