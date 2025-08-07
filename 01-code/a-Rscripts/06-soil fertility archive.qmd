@@ -1,0 +1,984 @@
+---
+title: "06-soil fertility archive"
+---
+
+## Packages
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(here)
+library(moments)
+library(MASS) #boxcox transformation
+library(lme4)         #mixed models
+library(lmerTest)     #mixed models
+library(broom.mixed)  #mixed models
+library(emmeans)
+library(FSA)
+
+```
+
+## Loading Data
+
+```{r}
+#will also need to add in 
+soil_fert <- read.csv(here::here("00-data", "b-prepared", 
+                                 "20250530_SCM-soil-fertility.csv"), 
+                           header = TRUE)
+
+bd <- read.csv(here::here("00-data", "b-prepared", 
+                          "20250718_SCM-BD.csv"), 
+                     header = TRUE)
+
+```
+
+## Format Data
+
+```{r}
+soil_fert <- soil_fert %>%
+             subset(block != 5) %>%
+             unite(col = "unique_ID", c("block", "plot"), sep = ".", remove = FALSE) %>%
+             mutate(sample_date = lubridate::as_date(sample_date, format = "%m/%d/%Y"),
+                    month = lubridate::month(sample_date),
+                    year = lubridate::isoyear(ymd(sample_date)),
+                    cn_ratio = total_c_wt_pct/total_n_wt_pct) %>%
+             mutate_at(c('unique_ID', 'block', 'plot', 'treatment', 'crop', 'year', 'month'), as.factor)
+
+start_end <- soil_fert %>%
+             subset((month == 5 & year == "2023") | (month == 10 & year == "2024"))
+
+
+soil_fert_23 <- subset(soil_fert, year == "2023")
+soil_fert_24 <- subset(soil_fert, year == "2024")
+
+bd <- bd %>%
+      subset(block != 5) %>%
+      mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
+             year = lubridate::isoyear(ymd(date_collected))) %>%
+      mutate_at(c('block', 'plot', 'treatment', 'crop', 'year'), as.factor)
+
+```
+
+
+## Soil Phosphorus
+
+### Outliers
+No outliers
+```{r}
+Q1 <- quantile(soil_fert$bray_p_ppm, 0.25, na.rm = TRUE) 
+Q3 <- quantile(soil_fert$bray_p_ppm, 0.75, na.rm = TRUE) 
+IQR <- IQR(soil_fert$bray_p_ppm,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, soil_fert$bray_p_ppm > upper_bound | 
+                    soil_fert$bray_p_ppm < lower_bound)
+
+```
+
+### Normality and Transformation
+
+Original dataset is non-parametric. Lambda is -2, indicating that a boxcox, inverse squared, or inverse cubed might be most appropriate. None of them are successful
+
+```{r}
+#original dataset
+hist(soil_fert$bray_p_ppm)
+skewness(soil_fert$bray_p_ppm, na.rm = TRUE)
+qqnorm(soil_fert$bray_p_ppm, main='Normal')
+qqline(soil_fert$bray_p_ppm)
+shapiro.test(soil_fert$bray_p_ppm)
+
+#boxcox
+bc <- boxcox(lm(soil_fert$bray_p_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_p <- (soil_fert$bray_p_ppm ^ lambda -1)/lambda
+
+hist(soil_fert$bc_p)
+skewness(soil_fert$bc_p, na.rm = TRUE)
+qqnorm(soil_fert$bc_p, main='Normal')
+qqline(soil_fert$bc_p)
+shapiro.test(soil_fert$bc_p)
+
+#inverse squared
+soil_fert$in_sq_p <- 1/soil_fert$bray_p_ppm^2
+
+hist(soil_fert$in_sq_p)
+skewness(soil_fert$in_sq_p, na.rm = TRUE)
+qqnorm(soil_fert$in_sq_p, main='Normal')
+qqline(soil_fert$in_sq_p)
+shapiro.test(soil_fert$in_sq_p)
+
+#inverse cubic
+soil_fert$in_cubic_p <- 1/soil_fert$bray_p_ppm^3
+
+hist(soil_fert$in_cubic_p)
+skewness(soil_fert$in_cubic_p, na.rm = TRUE)
+qqnorm(soil_fert$in_cubic_p, main='Normal')
+qqline(soil_fert$in_cubic_p)
+shapiro.test(soil_fert$in_cubic_p)
+
+```
+
+#### 2023
+original dataset is normally distributed
+```{r}
+
+soil_fert_23 <- subset(soil_fert, year == "2023")
+
+#original dataset
+hist(soil_fert_23$bray_p_ppm)
+skewness(soil_fert_23$bray_p_ppm, na.rm = TRUE)
+qqnorm(soil_fert_23$bray_p_ppm, main='Normal')
+qqline(soil_fert_23$bray_p_ppm)
+shapiro.test(soil_fert_23$bray_p_ppm)
+
+```
+
+#### 2024
+Original dataset is non-parametric. Lambda is between 0 and -0.5, indicating that a boxcox, inverse sqrt, or log transformation would be most appropriate. None is successful
+```{r}
+
+soil_fert_24 <- subset(soil_fert, year == "2024")
+
+#original dataset
+hist(soil_fert_24$bray_p_ppm)
+skewness(soil_fert_24$bray_p_ppm, na.rm = TRUE)
+qqnorm(soil_fert_24$bray_p_ppm, main='Normal')
+qqline(soil_fert_24$bray_p_ppm)
+shapiro.test(soil_fert_24$bray_p_ppm)
+
+#boxcox
+bc <- boxcox(lm(soil_fert_24$bray_p_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_24$bc_p <- (soil_fert_24$bray_p_ppm ^ lambda -1)/lambda
+
+hist(soil_fert_24$bc_p)
+skewness(soil_fert_24$bc_p, na.rm = TRUE)
+qqnorm(soil_fert_24$bc_p, main='Normal')
+qqline(soil_fert_24$bc_p)
+shapiro.test(soil_fert_24$bc_p)
+
+#log
+soil_fert_24$log_p <- log10(soil_fert_24$bray_p_ppm)
+
+hist(soil_fert_24$log_p)
+skewness(soil_fert_24$log_p, na.rm = TRUE)
+qqnorm(soil_fert_24$log_p, main='Normal')
+qqline(soil_fert_24$log_p)
+shapiro.test(soil_fert_24$log_p)
+
+#inverse sqrt
+soil_fert_24$in_sqrt_p <- 1/sqrt(soil_fert_24$bray_p_ppm)
+
+hist(soil_fert_24$in_sqrt_p)
+skewness(soil_fert_24$in_sqrt_p, na.rm = TRUE)
+qqnorm(soil_fert_24$in_sqrt_p, main='Normal')
+qqline(soil_fert_24$in_sqrt_p)
+shapiro.test(soil_fert_24$in_sqrt_p)
+
+```
+
+
+#### comparing start and end
+Original dataset is non-parametric. Lambda is 1.5, indicating that a boxcox, squared, or cubed might be most appropriate. None of them are successful
+```{r}
+#original dataset
+hist(start_end$bray_p_ppm)
+skewness(start_end$bray_p_ppm, na.rm = TRUE)
+qqnorm(start_end$bray_p_ppm, main='Normal')
+qqline(start_end$bray_p_ppm)
+shapiro.test(start_end$bray_p_ppm)
+
+#boxcox
+bc <- boxcox(lm(start_end$bray_p_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+start_end$bc_p <- (start_end$bray_p_ppm ^ lambda -1)/lambda
+
+hist(start_end$bc_p)
+skewness(start_end$bc_p, na.rm = TRUE)
+qqnorm(start_end$bc_p, main='Normal')
+qqline(start_end$bc_p)
+shapiro.test(start_end$bc_p)
+
+#squared
+start_end$sq_p <- start_end$bray_p_ppm^2
+
+hist(start_end$sq_p)
+skewness(start_end$sq_p, na.rm = TRUE)
+qqnorm(start_end$sq_p, main='Normal')
+qqline(start_end$sq_p)
+shapiro.test(start_end$sq_p)
+
+#cubic
+start_end$cubic_p <- start_end$bray_p_ppm^3
+
+hist(start_end$cubic_p)
+skewness(start_end$cubic_p, na.rm = TRUE)
+qqnorm(start_end$cubic_p, main='Normal')
+qqline(start_end$cubic_p)
+shapiro.test(start_end$cubic_p)
+```
+
+## Soil Potassium
+
+### Outliers
+No outliers!
+```{r}
+Q1 <- quantile(soil_fert$k_ppm, 0.25, na.rm = TRUE) 
+Q3 <- quantile(soil_fert$k_ppm, 0.75, na.rm = TRUE) 
+IQR <- IQR(soil_fert$k_ppm,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, soil_fert$k_ppm > upper_bound | 
+                    soil_fert$k_ppm < lower_bound)
+
+```
+
+### Normality
+
+#### Overall
+
+Normally distributed!
+
+```{r}
+hist(soil_fert$k_ppm)
+skewness(soil_fert$k_ppm, na.rm = TRUE)
+qqnorm(soil_fert$k_ppm, main='Normal')
+qqline(soil_fert$k_ppm)
+shapiro.test(soil_fert$k_ppm)
+```
+
+#### 2023
+
+Normally distributed!
+```{r}
+hist(soil_fert_23$k_ppm)
+skewness(soil_fert_23$k_ppm, na.rm = TRUE)
+qqnorm(soil_fert_23$k_ppm, main='Normal')
+qqline(soil_fert_23$k_ppm)
+shapiro.test(soil_fert_23$k_ppm)
+```
+
+#### 2024
+Normally distributed!
+```{r}
+hist(soil_fert_24$k_ppm)
+skewness(soil_fert_24$k_ppm, na.rm = TRUE)
+qqnorm(soil_fert_24$k_ppm, main='Normal')
+qqline(soil_fert_24$k_ppm)
+shapiro.test(soil_fert_24$k_ppm)
+```
+
+## Total Carbon
+
+### Outliers
+The only outlier is ever so slightly higher than the upper bound, to the point where I think it's still within the realm of possibility
+```{r}
+Q1 <- quantile(soil_fert$total_c_wt_pct, 0.25, na.rm = TRUE) 
+Q3 <- quantile(soil_fert$total_c_wt_pct, 0.75, na.rm = TRUE) 
+IQR <- IQR(soil_fert$total_c_wt_pct,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, soil_fert$total_c_wt_pct > upper_bound | 
+                    soil_fert$total_c_wt_pct < lower_bound)
+
+```
+
+#### Normality
+
+##### Overall
+
+Nearly normal to start with. Lambda is -1.35, indicating that a box cox or inverse square would be most appropriate. Both are successful, boxcox has the better distribution
+
+```{r}
+hist(soil_fert$total_c_wt_pct)
+skewness(soil_fert$total_c_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert$total_c_wt_pct, main='Normal')
+qqline(soil_fert$total_c_wt_pct)
+shapiro.test(soil_fert$total_c_wt_pct)
+
+#boxcox
+bc <- boxcox(lm(soil_fert$total_c_wt_pct ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_c <- (soil_fert$total_c_wt_pct ^ lambda -1)/lambda
+
+hist(soil_fert$bc_c)
+skewness(soil_fert$bc_c, na.rm = TRUE)
+qqnorm(soil_fert$bc_c, main='Normal')
+qqline(soil_fert$bc_c)
+shapiro.test(soil_fert$bc_c)
+
+# inverse square
+soil_fert$in_sq_c <- 1/soil_fert$total_c_wt_pct^2
+
+hist(soil_fert$in_sq_c)
+skewness(soil_fert$in_sq_c, na.rm = TRUE)
+qqnorm(soil_fert$in_sq_c, main='Normal')
+qqline(soil_fert$in_sq_c)
+shapiro.test(soil_fert$in_sq_c)
+
+```
+
+##### 2023 only
+Normally distributed!
+```{r}
+hist(soil_fert_23$total_c_wt_pct)
+skewness(soil_fert_23$total_c_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert_23$total_c_wt_pct, main='Normal')
+qqline(soil_fert_23$total_c_wt_pct)
+shapiro.test(soil_fert_23$total_c_wt_pct)
+```
+
+##### 2024 only
+Normally distributed!
+```{r}
+hist(soil_fert_24$total_c_wt_pct)
+skewness(soil_fert_24$total_c_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert_24$total_c_wt_pct, main='Normal')
+qqline(soil_fert_24$total_c_wt_pct)
+shapiro.test(soil_fert_24$total_c_wt_pct)
+```
+
+## Bulk Density
+
+### Outliers
+
+No outliers
+```{r}
+Q1 <- quantile(bd$bulk_density, 0.25, na.rm = TRUE) 
+Q3 <- quantile(bd$bulk_density, 0.75, na.rm = TRUE) 
+IQR <- IQR(bd$bulk_density,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, bd$bulk_density > upper_bound | 
+                    bd$bulk_density < lower_bound)
+
+```
+
+### Normality
+
+#### Overall
+
+Original dataset is not normally distributed. The lambda is between 0.5 and 1, indicating that a boxcox or sqrt transformation will be most appropriate. Neither is successful
+
+```{r}
+hist(bd$bulk_density)
+skewness(bd$bulk_density, na.rm = TRUE)
+qqnorm(bd$bulk_density, main='Normal')
+qqline(bd$bulk_density)
+shapiro.test(bd$bulk_density)
+
+#boxcox
+bc <- boxcox(lm(bd$bulk_density ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+bd$bc_bd <- (bd$bulk_density ^ lambda -1)/lambda
+
+hist(bd$bc_bd)
+skewness(bd$bc_bd, na.rm = TRUE)
+qqnorm(bd$bc_bd, main='Normal')
+qqline(bd$bc_bd)
+shapiro.test(bd$bc_bd)
+
+#sqrt
+bd$sqrt_bd <- sqrt(bd$bulk_density)
+
+hist(bd$sqrt_bd)
+skewness(bd$sqrt_bd, na.rm = TRUE)
+qqnorm(bd$sqrt_bd, main='Normal')
+qqline(bd$sqrt_bd)
+shapiro.test(bd$sqrt_bd)
+```
+
+#### 2023
+
+normally distributed!
+
+```{r}
+bd_23 <- subset(bd, year == "2023")
+
+hist(bd_23$bulk_density)
+skewness(bd_23$bulk_density, na.rm = TRUE)
+qqnorm(bd_23$bulk_density, main='Normal')
+qqline(bd_23$bulk_density)
+shapiro.test(bd_23$bulk_density)
+
+```
+
+#### 2024
+Normally distributed!
+```{r}
+bd_24 <- subset(bd, year == "2024")
+
+hist(bd_24$bulk_density)
+skewness(bd_24$bulk_density, na.rm = TRUE)
+qqnorm(bd_24$bulk_density, main='Normal')
+qqline(bd_24$bulk_density)
+shapiro.test(bd_24$bulk_density)
+
+```
+
+## Nitrate
+
+### Outliers
+
+Lol, all the outliers are from may 2023. Removing the highest one, though, because it also had an aggressively elevated NH4
+```{r}
+Q1 <- quantile(soil_fert$NO3_ppm, 0.25, na.rm = TRUE) 
+Q3 <- quantile(soil_fert$NO3_ppm, 0.75, na.rm = TRUE) 
+IQR <- IQR(soil_fert$NO3_ppm,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, soil_fert$NO3_ppm > upper_bound | 
+                    soil_fert$NO3_ppm < lower_bound)
+
+soil_fert$NO3_ppm[soil_fert$sample_date == "2023-05-23" &
+                  soil_fert$block == "1" &
+                  soil_fert$plot == "A"] <- NA
+
+soil_fert_23 <- subset(soil_fert, year == "2023")
+
+```
+
+### Normality
+
+#### Overall
+The original dataset is non-parametric with a lambda between 0 and -0.5, indicating that a log, boxcox, or inverse sqrt would be most appropriate. None are successful.
+
+```{r}
+hist(soil_fert$NO3_ppm)
+skewness(soil_fert$NO3_ppm, na.rm = TRUE)
+qqnorm(soil_fert$NO3_ppm, main='Normal')
+qqline(soil_fert$NO3_ppm)
+shapiro.test(soil_fert$NO3_ppm)
+
+# boxcox
+bc <- boxcox(lm(soil_fert$NO3_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_NO3 <- (soil_fert$NO3_ppm ^ lambda -1)/lambda
+
+hist(soil_fert$bc_NO3)
+skewness(soil_fert$bc_NO3, na.rm = TRUE)
+qqnorm(soil_fert$bc_NO3, main='Normal')
+qqline(soil_fert$bc_NO3)
+shapiro.test(soil_fert$bc_NO3)
+
+#log
+soil_fert$log_NO3 <- log10(soil_fert$NO3_ppm)
+
+hist(soil_fert$log_NO3)
+skewness(soil_fert$log_NO3, na.rm = TRUE)
+qqnorm(soil_fert$log_NO3, main='Normal')
+qqline(soil_fert$log_NO3)
+shapiro.test(soil_fert$log_NO3)
+
+#inverse sqrt
+soil_fert$in_sqrt_NO3 <- 1/sqrt(soil_fert$NO3_ppm)
+
+hist(soil_fert$in_sqrt_NO3)
+skewness(soil_fert$in_sqrt_NO3, na.rm = TRUE)
+qqnorm(soil_fert$in_sqrt_NO3, main='Normal')
+qqline(soil_fert$in_sqrt_NO3)
+shapiro.test(soil_fert$in_sqrt_NO3)
+
+
+```
+
+#### 2023
+The original dataset is non-parametric with a lambda between 0 and -0.5, indicating that a log, boxcox, or inverse sqrt would be most appropriate. None are successful.
+```{r}
+hist(soil_fert_23$NO3_ppm)
+skewness(soil_fert_23$NO3_ppm, na.rm = TRUE)
+qqnorm(soil_fert_23$NO3_ppm, main='Normal')
+qqline(soil_fert_23$NO3_ppm)
+shapiro.test(soil_fert_23$NO3_ppm)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_23$NO3_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_23$bc_NO3 <- (soil_fert_23$NO3_ppm ^ lambda -1)/lambda
+
+hist(soil_fert_23$bc_NO3)
+skewness(soil_fert_23$bc_NO3, na.rm = TRUE)
+qqnorm(soil_fert_23$bc_NO3, main='Normal')
+qqline(soil_fert_23$bc_NO3)
+shapiro.test(soil_fert_23$bc_NO3)
+
+#log
+soil_fert_23$log_NO3 <- log10(soil_fert_23$NO3_ppm)
+
+hist(soil_fert_23$log_NO3)
+skewness(soil_fert_23$log_NO3, na.rm = TRUE)
+qqnorm(soil_fert_23$log_NO3, main='Normal')
+qqline(soil_fert_23$log_NO3)
+shapiro.test(soil_fert_23$log_NO3)
+
+#inverse sqrt
+soil_fert_23$in_sqrt_NO3 <- 1/sqrt(soil_fert_23$NO3_ppm)
+
+hist(soil_fert_23$in_sqrt_NO3)
+skewness(soil_fert_23$in_sqrt_NO3, na.rm = TRUE)
+qqnorm(soil_fert_23$in_sqrt_NO3, main='Normal')
+qqline(soil_fert_23$in_sqrt_NO3)
+shapiro.test(soil_fert_23$in_sqrt_NO3)
+
+
+```
+
+#### 2024
+The original dataset is non-parametric with a lambda between -1 and -0.5, indicating that a boxcox, inverse, or inverse sqrt would be most appropriate. None are successful.
+```{r}
+hist(soil_fert_24$NO3_ppm)
+skewness(soil_fert_24$NO3_ppm, na.rm = TRUE)
+qqnorm(soil_fert_24$NO3_ppm, main='Normal')
+qqline(soil_fert_24$NO3_ppm)
+shapiro.test(soil_fert_24$NO3_ppm)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_24$NO3_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_24$bc_NO3 <- (soil_fert_24$NO3_ppm ^ lambda -1)/lambda
+
+hist(soil_fert_24$bc_NO3)
+skewness(soil_fert_24$bc_NO3, na.rm = TRUE)
+qqnorm(soil_fert_24$bc_NO3, main='Normal')
+qqline(soil_fert_24$bc_NO3)
+shapiro.test(soil_fert_24$bc_NO3)
+
+#inverse sqrt
+soil_fert_24$in_sqrt_NO3 <- 1/sqrt(soil_fert_24$NO3_ppm)
+
+hist(soil_fert_24$in_sqrt_NO3)
+skewness(soil_fert_24$in_sqrt_NO3, na.rm = TRUE)
+qqnorm(soil_fert_24$in_sqrt_NO3, main='Normal')
+qqline(soil_fert_24$in_sqrt_NO3)
+shapiro.test(soil_fert_24$in_sqrt_NO3)
+
+#inverse sqrt
+soil_fert_24$in_NO3 <- 1/soil_fert_24$NO3_ppm
+
+hist(soil_fert_24$in_NO3)
+skewness(soil_fert_24$in_NO3, na.rm = TRUE)
+qqnorm(soil_fert_24$in_NO3, main='Normal')
+qqline(soil_fert_24$in_NO3)
+shapiro.test(soil_fert_24$in_NO3)
+
+
+```
+
+## Ammonium
+
+### Outliers
+
+Eight potential outliers, and I have become suspicious of 1-A in May 2023. 
+```{r}
+Q1 <- quantile(soil_fert$NH4_ppm, 0.25, na.rm = TRUE) 
+Q3 <- quantile(soil_fert$NH4_ppm, 0.75, na.rm = TRUE) 
+IQR <- IQR(soil_fert$NH4_ppm,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, soil_fert$NH4_ppm > upper_bound | 
+                    soil_fert$NH4_ppm < lower_bound)
+
+soil_fert$NH4_ppm[soil_fert$sample_date == "2023-05-23" &
+                  soil_fert$block == "1" &
+                  soil_fert$plot == "A"] <- NA
+
+soil_fert_23 <- subset(soil_fert, year == "2023")
+
+```
+
+### Normality
+
+#### Overall
+Original dataset is non-parametric, with a lambda between 0 and 0.5, indicating that a boxcox, log, or sqrt transformation will be most appropriate. None are successful
+```{r}
+hist(soil_fert$NH4_ppm)
+skewness(soil_fert$NH4_ppm, na.rm = TRUE)
+qqnorm(soil_fert$NH4_ppm, main='Normal')
+qqline(soil_fert$NH4_ppm)
+shapiro.test(soil_fert$NH4_ppm)
+
+# boxcox
+bc <- boxcox(lm(soil_fert$NH4_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_NH4 <- (soil_fert$NH4_ppm ^ lambda -1)/lambda
+
+hist(soil_fert$bc_NH4)
+skewness(soil_fert$bc_NH4, na.rm = TRUE)
+qqnorm(soil_fert$bc_NH4, main='Normal')
+qqline(soil_fert$bc_NH4)
+shapiro.test(soil_fert$bc_NH4)
+
+#log
+soil_fert$log_NH4 <- log10(soil_fert$NH4_ppm)
+
+hist(soil_fert$log_NH4)
+skewness(soil_fert$log_NH4, na.rm = TRUE)
+qqnorm(soil_fert$log_NH4, main='Normal')
+qqline(soil_fert$log_NH4)
+shapiro.test(soil_fert$log_NH4)
+
+#sqrt
+soil_fert$sqrt_NH4 <- sqrt(soil_fert$NH4_ppm)
+
+hist(soil_fert$sqrt_NH4)
+skewness(soil_fert$sqrt_NH4, na.rm = TRUE)
+qqnorm(soil_fert$sqrt_NH4, main='Normal')
+qqline(soil_fert$sqrt_NH4)
+shapiro.test(soil_fert$sqrt_NH4)
+
+
+```
+#### 2023 only
+Original dataset is non-parametric, with a lambda about 0.5, indicating that a boxcox or sqrt transformation will be most appropriate. None are successful
+```{r}
+hist(soil_fert_23$NH4_ppm)
+skewness(soil_fert_23$NH4_ppm, na.rm = TRUE)
+qqnorm(soil_fert_23$NH4_ppm, main='Normal')
+qqline(soil_fert_23$NH4_ppm)
+shapiro.test(soil_fert_23$NH4_ppm)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_23$NH4_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_23$bc_NH4 <- (soil_fert_23$NH4_ppm ^ lambda -1)/lambda
+
+hist(soil_fert_23$bc_NH4)
+skewness(soil_fert_23$bc_NH4, na.rm = TRUE)
+qqnorm(soil_fert_23$bc_NH4, main='Normal')
+qqline(soil_fert_23$bc_NH4)
+shapiro.test(soil_fert_23$bc_NH4)
+
+#sqrt
+soil_fert_23$sqrt_NH4 <- sqrt(soil_fert_23$NH4_ppm)
+
+hist(soil_fert_23$sqrt_NH4)
+skewness(soil_fert_23$sqrt_NH4, na.rm = TRUE)
+qqnorm(soil_fert_23$sqrt_NH4, main='Normal')
+qqline(soil_fert_23$sqrt_NH4)
+shapiro.test(soil_fert_23$sqrt_NH4)
+
+
+```
+
+#### 2024 only
+Original dataset is non-parametric, with a lambda between 0 and -0.5, indicating that a boxcox, log, or inverse sqrt transformation will be most appropriate. Boxcox and inverse square root are successful, though boxcox has the better distribution
+```{r}
+hist(soil_fert_24$NH4_ppm)
+skewness(soil_fert_24$NH4_ppm, na.rm = TRUE)
+qqnorm(soil_fert_24$NH4_ppm, main='Normal')
+qqline(soil_fert_24$NH4_ppm)
+shapiro.test(soil_fert_24$NH4_ppm)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_24$NH4_ppm ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_24$bc_NH4 <- (soil_fert_24$NH4_ppm ^ lambda -1)/lambda
+
+hist(soil_fert_24$bc_NH4)
+skewness(soil_fert_24$bc_NH4, na.rm = TRUE)
+qqnorm(soil_fert_24$bc_NH4, main='Normal')
+qqline(soil_fert_24$bc_NH4)
+shapiro.test(soil_fert_24$bc_NH4)
+
+#log
+soil_fert_24$log_NH4 <- log10(soil_fert_24$NH4_ppm)
+
+hist(soil_fert_24$log_NH4)
+skewness(soil_fert_24$log_NH4, na.rm = TRUE)
+qqnorm(soil_fert_24$log_NH4, main='Normal')
+qqline(soil_fert_24$log_NH4)
+shapiro.test(soil_fert_24$log_NH4)
+
+#inverse sqrt
+soil_fert_24$sqrt_NH4 <- 1/sqrt(soil_fert_24$NH4_ppm)
+
+hist(soil_fert_24$sqrt_NH4)
+skewness(soil_fert_24$sqrt_NH4, na.rm = TRUE)
+qqnorm(soil_fert_24$sqrt_NH4, main='Normal')
+qqline(soil_fert_24$sqrt_NH4)
+shapiro.test(soil_fert_24$sqrt_NH4)
+
+
+```
+
+
+## Total N
+
+### Outliers
+
+The two potential outliers are 0.01 above the upper bound, so I feel good keeping them in
+```{r}
+Q1 <- quantile(soil_fert$total_n_wt_pct, 0.25, na.rm = TRUE) 
+Q3 <- quantile(soil_fert$total_n_wt_pct, 0.75, na.rm = TRUE) 
+IQR <- IQR(soil_fert$total_n_wt_pct,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, soil_fert$total_n_wt_pct > upper_bound | 
+                    soil_fert$total_n_wt_pct < lower_bound)
+
+```
+
+### Normality
+
+#### Overall
+Original dataset is not normally distributed, with a lambda just under 0 indicating that a boxcox or log transformation would be most appropriate. Neither are successful
+```{r}
+hist(soil_fert$total_n_wt_pct)
+skewness(soil_fert$total_n_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert$total_n_wt_pct, main='Normal')
+qqline(soil_fert$total_n_wt_pct)
+shapiro.test(soil_fert$total_n_wt_pct)
+
+# boxcox
+bc <- boxcox(lm(soil_fert$total_n_wt_pct ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_n <- (soil_fert$total_n_wt_pct ^ lambda -1)/lambda
+
+hist(soil_fert$bc_n)
+skewness(soil_fert$bc_n, na.rm = TRUE)
+qqnorm(soil_fert$bc_n, main='Normal')
+qqline(soil_fert$bc_n)
+shapiro.test(soil_fert$bc_n)
+
+#log
+soil_fert$log_n <- log10(soil_fert$total_n_wt_pct)
+
+hist(soil_fert$log_n)
+skewness(soil_fert$log_n, na.rm = TRUE)
+qqnorm(soil_fert$log_n, main='Normal')
+qqline(soil_fert$log_n)
+shapiro.test(soil_fert$log_n)
+
+
+```
+
+#### 2023 
+Original dataset is not normally distributed, with a lambda ~ 0.5 indicating that a boxcox or sqrt transformation would be most appropriate. Neither are successful. It is nearly normally distributed to start with though
+```{r}
+hist(soil_fert_23$total_n_wt_pct)
+skewness(soil_fert_23$total_n_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert_23$total_n_wt_pct, main='Normal')
+qqline(soil_fert_23$total_n_wt_pct)
+shapiro.test(soil_fert_23$total_n_wt_pct)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_23$total_n_wt_pct ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_23$bc_n <- (soil_fert_23$total_n_wt_pct ^ lambda -1)/lambda
+
+hist(soil_fert_23$bc_n)
+skewness(soil_fert_23$bc_n, na.rm = TRUE)
+qqnorm(soil_fert_23$bc_n, main='Normal')
+qqline(soil_fert_23$bc_n)
+shapiro.test(soil_fert_23$bc_n)
+
+#sqrt
+soil_fert_23$sqrt_n <- sqrt(soil_fert_23$total_n_wt_pct)
+
+hist(soil_fert_23$sqrt_n)
+skewness(soil_fert_23$sqrt_n, na.rm = TRUE)
+qqnorm(soil_fert_23$sqrt_n, main='Normal')
+qqline(soil_fert_23$sqrt_n)
+shapiro.test(soil_fert_23$sqrt_n)
+
+
+```
+
+#### 2024 
+Original dataset is not normally distributed, with a lambda between 0 and 0.5 indicating that a boxcox, log, or sqrt transformation would be most appropriate. Neither are successful. It is nearly normally distributed to start with though
+```{r}
+hist(soil_fert_24$total_n_wt_pct)
+skewness(soil_fert_24$total_n_wt_pct, na.rm = TRUE)
+qqnorm(soil_fert_24$total_n_wt_pct, main='Normal')
+qqline(soil_fert_24$total_n_wt_pct)
+shapiro.test(soil_fert_24$total_n_wt_pct)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_24$total_n_wt_pct ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_24$bc_n <- (soil_fert_24$total_n_wt_pct ^ lambda -1)/lambda
+
+hist(soil_fert_24$bc_n)
+skewness(soil_fert_24$bc_n, na.rm = TRUE)
+qqnorm(soil_fert_24$bc_n, main='Normal')
+qqline(soil_fert_24$bc_n)
+shapiro.test(soil_fert_24$bc_n)
+
+#sqrt
+soil_fert_24$sqrt_n <- sqrt(soil_fert_24$total_n_wt_pct)
+
+hist(soil_fert_24$sqrt_n)
+skewness(soil_fert_24$sqrt_n, na.rm = TRUE)
+qqnorm(soil_fert_24$sqrt_n, main='Normal')
+qqline(soil_fert_24$sqrt_n)
+shapiro.test(soil_fert_24$sqrt_n)
+
+#log
+soil_fert_24$log_n <- log10(soil_fert_24$total_n_wt_pct)
+
+hist(soil_fert_24$log_n)
+skewness(soil_fert_24$log_n, na.rm = TRUE)
+qqnorm(soil_fert_24$log_n, main='Normal')
+qqline(soil_fert_24$log_n)
+shapiro.test(soil_fert_24$log_n)
+
+
+```
+
+## C:N ratio
+
+### Outliers
+
+Three potential outliers are just barely over the upper bound
+```{r}
+Q1 <- quantile(soil_fert$cn_ratio, 0.25, na.rm = TRUE) 
+Q3 <- quantile(soil_fert$cn_ratio, 0.75, na.rm = TRUE) 
+IQR <- IQR(soil_fert$cn_ratio,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(soil_fert, soil_fert$cn_ratio > upper_bound | 
+                    soil_fert$cn_ratio < lower_bound)
+
+```
+
+### Normality
+
+##### Overall
+Original dataset is not normally distributed, with a lambda of -2 indicating that a boxcox, inverse square, or inverse cube would be most appropriate. None are successful
+```{r}
+hist(soil_fert$cn_ratio)
+skewness(soil_fert$cn_ratio, na.rm = TRUE)
+qqnorm(soil_fert$cn_ratio, main='Normal')
+qqline(soil_fert$cn_ratio)
+shapiro.test(soil_fert$cn_ratio)
+
+# boxcox
+bc <- boxcox(lm(soil_fert$cn_ratio ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert$bc_cn <- (soil_fert$cn_ratio ^ lambda -1)/lambda
+
+hist(soil_fert$bc_cn)
+skewness(soil_fert$bc_cn, na.rm = TRUE)
+qqnorm(soil_fert$bc_cn, main='Normal')
+qqline(soil_fert$bc_cn)
+shapiro.test(soil_fert$bc_cn)
+
+#inverse square
+soil_fert$in_sq_cn <- 1/soil_fert$cn_ratio^2
+
+hist(soil_fert$in_sq_cn)
+skewness(soil_fert$in_sq_cn, na.rm = TRUE)
+qqnorm(soil_fert$in_sq_cn, main='Normal')
+qqline(soil_fert$in_sq_cn)
+shapiro.test(soil_fert$in_sq_cn)
+
+#inverse cube
+soil_fert$in_cube_cn <- 1/soil_fert$cn_ratio^3
+
+hist(soil_fert$in_cube_cn)
+skewness(soil_fert$in_cube_cn, na.rm = TRUE)
+qqnorm(soil_fert$in_cube_cn, main='Normal')
+qqline(soil_fert$in_cube_cn)
+shapiro.test(soil_fert$in_cube_cn)
+
+
+```
+
+#### 2023 only
+Original dataset is not normally distributed, with a lambda of -2 indicating that a boxcox, inverse square, or inverse cube would be most appropriate. None are successful
+```{r}
+hist(soil_fert_23$cn_ratio)
+skewness(soil_fert_23$cn_ratio, na.rm = TRUE)
+qqnorm(soil_fert_23$cn_ratio, main='Normal')
+qqline(soil_fert_23$cn_ratio)
+shapiro.test(soil_fert_23$cn_ratio)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_23$cn_ratio ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_23$bc_cn <- (soil_fert_23$cn_ratio ^ lambda -1)/lambda
+
+hist(soil_fert_23$bc_cn)
+skewness(soil_fert_23$bc_cn, na.rm = TRUE)
+qqnorm(soil_fert_23$bc_cn, main='Normal')
+qqline(soil_fert_23$bc_cn)
+shapiro.test(soil_fert_23$bc_cn)
+
+#inverse square
+soil_fert_23$in_sq_cn <- 1/soil_fert_23$cn_ratio^2
+
+hist(soil_fert_23$in_sq_cn)
+skewness(soil_fert_23$in_sq_cn, na.rm = TRUE)
+qqnorm(soil_fert_23$in_sq_cn, main='Normal')
+qqline(soil_fert_23$in_sq_cn)
+shapiro.test(soil_fert_23$in_sq_cn)
+
+#inverse cube
+soil_fert_23$in_cube_cn <- 1/soil_fert_23$cn_ratio^3
+
+hist(soil_fert_23$in_cube_cn)
+skewness(soil_fert_23$in_cube_cn, na.rm = TRUE)
+qqnorm(soil_fert_23$in_cube_cn, main='Normal')
+qqline(soil_fert_23$in_cube_cn)
+shapiro.test(soil_fert_23$in_cube_cn)
+
+
+```
+#### 2024 only
+Original dataset is not normally distributed, with a lambda of -2 indicating that a boxcox, inverse square, or inverse cube would be most appropriate. None are successful
+```{r}
+hist(soil_fert_24$cn_ratio)
+skewness(soil_fert_24$cn_ratio, na.rm = TRUE)
+qqnorm(soil_fert_24$cn_ratio, main='Normal')
+qqline(soil_fert_24$cn_ratio)
+shapiro.test(soil_fert_24$cn_ratio)
+
+# boxcox
+bc <- boxcox(lm(soil_fert_24$cn_ratio ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_fert_24$bc_cn <- (soil_fert_24$cn_ratio ^ lambda -1)/lambda
+
+hist(soil_fert_24$bc_cn)
+skewness(soil_fert_24$bc_cn, na.rm = TRUE)
+qqnorm(soil_fert_24$bc_cn, main='Normal')
+qqline(soil_fert_24$bc_cn)
+shapiro.test(soil_fert_24$bc_cn)
+
+#inverse square
+soil_fert_24$in_sq_cn <- 1/soil_fert_24$cn_ratio^2
+
+hist(soil_fert_24$in_sq_cn)
+skewness(soil_fert_24$in_sq_cn, na.rm = TRUE)
+qqnorm(soil_fert_24$in_sq_cn, main='Normal')
+qqline(soil_fert_24$in_sq_cn)
+shapiro.test(soil_fert_24$in_sq_cn)
+
+#inverse cube
+soil_fert_24$in_cube_cn <- 1/soil_fert_24$cn_ratio^3
+
+hist(soil_fert_24$in_cube_cn)
+skewness(soil_fert_24$in_cube_cn, na.rm = TRUE)
+qqnorm(soil_fert_24$in_cube_cn, main='Normal')
+qqline(soil_fert_24$in_cube_cn)
+shapiro.test(soil_fert_24$in_cube_cn)
+
+
+```

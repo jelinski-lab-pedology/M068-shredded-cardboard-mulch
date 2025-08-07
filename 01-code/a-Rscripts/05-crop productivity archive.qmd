@@ -1,0 +1,3031 @@
+---
+title: "05-crop productivity archive"
+---
+## Packages
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(here)
+library(MASS) #boxcox transformation
+library(lme4)         #mixed models
+library(lmerTest)     #mixed models
+library(broom.mixed)  #mixed models
+library(emmeans)
+```
+
+## Loading Data
+
+```{r}
+yield <- read.csv(here::here("00-data", "b-prepared", 
+                             "20250725_SCM-yield.csv"), 
+                      header = TRUE)
+
+spad <- read.csv(here::here("00-data", "b-prepared", 
+                            "20250716_SCM-SPAD.csv"), 
+                     header = TRUE)
+
+```
+
+## Format Data
+
+### yield
+```{r}
+#Move edge data into a separate dataframe
+edge <- subset(yield, block == "edge")
+biomass <- subset(yield, is.na(biomass_g) == FALSE)
+
+#overall formatting
+yield <- yield %>%
+        subset(block != 5) %>%
+        subset(block != "edge") %>%
+        dplyr::select(-notes, biomass_g) %>%
+        mutate(date_collected = lubridate::as_date(date_collected, 
+                                                   format = "%m/%d/%Y"),
+               year = lubridate::isoyear(ymd(date_collected)),
+               month = lubridate::month(date_collected),
+               week = lubridate::isoweek(ymd(date_collected))) %>%
+        mutate_at(c('block', 'plot', 'treatment', 
+                    'crop', "year", "week", "month"), 
+                  as.factor) %>%
+        group_by(date_collected, week, month, year, 
+                 block, plot, treatment, crop) %>%
+        summarize(marketable_g = sum(marketable_g, na.rm = TRUE),
+                  unmarketable_g = sum(unmarketable_g, na.rm = TRUE),
+                  total_g = sum(total_g, na.rm = TRUE),
+                  per_market = (marketable_g/total_g)*100,
+                  per_unmarket = (unmarketable_g/total_g)*100) %>%
+        ungroup
+
+# calculating the total yield per week for each plot
+# mostly impacts 2023, when we occassionally harvested 2x per week
+yield_wk <- yield %>%
+            group_by(week, year, block, plot, treatment, crop) %>%
+            summarize(marketable_g = sum(marketable_g, na.rm = TRUE),
+                      unmarketable_g = sum(unmarketable_g, na.rm = TRUE),
+                      total_g = sum(total_g, na.rm = TRUE),
+                      per_market = (marketable_g/total_g)*100,
+                      per_unmarket = (unmarketable_g/total_g)*100) %>%
+            ungroup
+
+# separate data frames for the weekly yield data for each crop
+yield_wk_AS <- subset(yield_wk, crop == "AS" & total_g != 0)
+yield_wk_23_AS <- subset(yield_wk_AS, year == "2023")
+yield_wk_24_AS <- subset(yield_wk_AS, year == "2024")
+
+yield_wk_DB <- subset(yield_wk, crop == "DB" & total_g != 0)
+yield_wk_23_DB <- subset(yield_wk_DB, year == "2023")
+yield_wk_24_DB <- subset(yield_wk_DB, year == "2024")
+
+yield_wk_FC <- subset(yield_wk, crop == "FC" & total_g != 0)
+yield_wk_23_FC <- subset(yield_wk_FC, year == "2023")
+yield_wk_24_FC <- subset(yield_wk_FC, year == "2024")
+
+# calculating annual yield for each plot
+yield_yr <- yield %>%
+            group_by(year, block, plot, treatment, crop) %>%
+            summarize(marketable_g = sum(marketable_g, na.rm = TRUE),
+                      unmarketable_g = sum(unmarketable_g, na.rm = TRUE),
+                      total_g = sum(total_g, na.rm = TRUE),
+                      per_market = (marketable_g/total_g)*100,
+                      per_unmarket = (unmarketable_g/total_g)*100) %>%
+            ungroup
+
+# separate data frames for the annual yield for each crop
+
+yield_yr_AS <- subset(yield_yr, crop == "AS")
+yield_23_AS <- subset(yield_yr_AS, year == "2023")
+yield_24_AS <- subset(yield_yr_AS, year == "2024")
+
+yield_yr_DB <- subset(yield_yr, crop == "DB")
+yield_23_DB <- subset(yield_yr_DB, year == "2023")
+yield_24_DB <- subset(yield_yr_DB, year == "2024")
+
+yield_yr_FC <- subset(yield_yr, crop == "FC")
+yield_23_FC <- subset(yield_yr_FC, year == "2023")
+yield_24_FC <- subset(yield_yr_FC, year == "2024")
+```
+
+### SPAD
+```{r}
+
+spad <- spad %>%
+        subset(block != 5) %>% 
+        dplyr::select(-average_reading) %>%
+        mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
+               year = lubridate::isoyear(ymd(date_collected))) %>%
+        pivot_longer(cols = c("reading_1", "reading_2", "reading_3"),
+                     names_to = "reading",
+                     values_to = "value") %>%
+        mutate_at(c('sampling','block', 'plot', 'treatment', 'crop', "year"), as.factor)
+
+spad_AS <- subset(spad, crop == "AS")
+spad_DB <- subset(spad, crop == "DB")
+spad_FC <- subset(spad, crop == "FC")
+```
+
+#### Strawberries
+
+There are 26 potential outliers. Except for a plant where all three readings were high in 1-B on 7/16/2024, others were individually elevated readings. Only one one was lower than the lower bound. 
+```{r}
+Q1 <- quantile(spad_AS$value, 0.25, na.rm = TRUE) 
+Q3 <- quantile(spad_AS$value, 0.75, na.rm = TRUE) 
+IQR <- IQR(spad_AS$value,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+spad_AS %>% subset(value > upper_bound | value < lower_bound)
+
+#saving a df with outliers for comparison
+spad_AS_out <- spad_AS
+
+#outliers removed
+spad_AS <- spad_AS %>%
+           subset(value > lower_bound & value < upper_bound)
+
+```
+
+#### Beans
+
+Wowza, 78 potential outliers identified. I'm tempted to do the same here, where I adjust the range a little to keep > 10 and < 50
+```{r}
+Q1 <- quantile(spad_DB$value, 0.25, na.rm = TRUE) 
+Q3 <- quantile(spad_DB$value, 0.75, na.rm = TRUE) 
+IQR <- IQR(spad_DB$value,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+spad_DB %>% subset(value > upper_bound | value < lower_bound)
+
+#saving a df with outliers for comparison
+spad_DB_out <- spad_DB
+
+#outliers removed
+spad_DB <- spad_DB %>%
+           subset(value > lower_bound & value < upper_bound)
+
+```
+
+#### Collards
+88 potential outliers! All but one above the upper bound. I feel more comfortable removing that one. 
+```{r}
+Q1 <- quantile(spad_FC$value, 0.25, na.rm = TRUE) 
+Q3 <- quantile(spad_FC$value, 0.75, na.rm = TRUE) 
+IQR <- IQR(spad_FC$value,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+spad_FC %>% subset(value > upper_bound | value < lower_bound)
+
+#saving a df with outliers for comparison
+spad_FC_out <- spad_FC
+
+#outliers removed
+spad_FC <- spad_FC %>%
+           subset(value > lower_bound & value < upper_bound)
+
+```
+
+## Outlier checks
+I moved all the outlier code for crop biomass here, because I didn't find any that needed action.
+### Weekly yield
+
+#### Strawberries
+
+##### Marketable
+
+There are six outliers, from weeks 34-36 in 2023, all above the upper bound. We had a really productive second harvest of strawberries--Nora was harvesting SO MANY--so while outside the normal range, I trust the data. If I run with the dataset that includes plots with 0g harvest, then there are 17 outliers -- but all with the same reason
+```{r}
+Q1 <- quantile(yield_wk_AS$marketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_AS$marketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_AS$marketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_AS, yield_wk_AS$marketable_g > upper_bound | 
+                    yield_wk_AS$marketable_g < lower_bound)
+```
+
+##### Percent marketable
+
+There are 25 potential outliers, all less than the lower bound (and most 0%). But, all were representative of real world conditions.
+
+```{r}
+Q1 <- quantile(yield_wk_AS$per_market, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_AS$per_market, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_AS$per_market,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_AS, yield_wk_AS$per_market > upper_bound | 
+                    yield_wk_AS$per_market < lower_bound)
+```
+
+##### Unmarketable
+
+There were 19 potential outliers, all higher than the upper bound. Most of the very high ones (like 5x the upper bound) were in 2023 during the second strawberry harvest. The rest were relatively close to the upper bound (only a couple grams higher). If I run with the dataset that includes plots with 0g harvest, then there are 39 outliers. 
+```{r}
+Q1 <- quantile(yield_wk_AS$unmarketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_AS$unmarketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_AS$unmarketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_AS, yield_wk_AS$unmarketable_g > upper_bound | 
+                    yield_wk_AS$unmarketable_g < lower_bound)
+```
+
+##### Total
+
+There were 5 potential outliers, several the same as marketable yield, for the large late-season harvest. If I run with the dataset that includes plots with 0g harvest, there are 19 outliers, with same reasons.
+```{r}
+Q1 <- quantile(yield_wk_AS$total_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_AS$total_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_AS$total_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_AS, yield_wk_AS$total_g > upper_bound | 
+                    yield_wk_AS$total_g < lower_bound)
+```
+
+#### Beans
+
+##### Marketable
+
+There were 8 potential outliers, all from the week we had just a truly overwhelming harvest in August (and we were harvesting heavily, as well, for a slew of upcoming neighborhood events). If I run with the dataset that includes plots with 0g harvest, it adds just two more for the same weeks
+```{r}
+Q1 <- quantile(yield_wk_DB$marketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_DB$marketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_DB$marketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_DB, yield_wk_DB$marketable_g > upper_bound | 
+                    yield_wk_DB$marketable_g < lower_bound)
+```
+
+##### Percent marketable
+
+Three potential outliers, all just slightly less than 100% -- and they're find because while there were very few unmarketable beans, they did happen occassionally
+```{r}
+Q1 <- quantile(yield_wk_DB$per_market, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_DB$per_market, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_DB$per_market,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_DB, yield_wk_DB$per_market > upper_bound | 
+                    yield_wk_DB$per_market < lower_bound)
+```
+
+##### Unmarketable
+
+Same three outliers as identified above
+```{r}
+Q1 <- quantile(yield_wk_DB$unmarketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_DB$unmarketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_DB$unmarketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_DB, yield_wk_DB$unmarketable_g > upper_bound | 
+                    yield_wk_DB$unmarketable_g < lower_bound)
+```
+
+##### Total
+
+Eight potential outliers, the same as identified for marketable. If I run with the dataset that includes plots with 0g harvest, same as above
+```{r}
+Q1 <- quantile(yield_wk_DB$total_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_DB$total_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_DB$total_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_DB, yield_wk_DB$total_g > upper_bound | 
+                    yield_wk_DB$total_g < lower_bound)
+```
+
+#### Collards
+
+##### Marketable
+
+There are 21 potential outliers, all from 2024. Half are close to the upper bound, and the other half are from the last days of harvest, after they hadn't been harvested for a month. If I run with the dataset that includes plots with 0g harvest, the same outliers are identified
+```{r}
+Q1 <- quantile(yield_wk_FC$marketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_FC$marketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_FC$marketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_FC, yield_wk_FC$marketable_g > upper_bound | 
+                    yield_wk_FC$marketable_g < lower_bound)
+```
+
+##### Percent marketable
+There are no outliers. Same if I run with the dataset that includes plots with 0g harvest
+```{r}
+Q1 <- quantile(yield_wk_FC$per_market, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_FC$per_market, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_FC$per_market,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_FC, yield_wk_FC$per_market > upper_bound | 
+                    yield_wk_FC$per_market < lower_bound)
+```
+
+##### Unmarketable
+
+There are 20 potential outliers, all from 2024, but none of them give me any reason to think they're out of place. If I run with the dataset that includes plots with 0g harvest, then there are eight additional rows, some from 2023. No concerns though
+```{r}
+Q1 <- quantile(yield_wk_FC$unmarketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_FC$unmarketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_FC$unmarketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_FC, yield_wk_FC$unmarketable_g > upper_bound | 
+                    yield_wk_FC$unmarketable_g < lower_bound)
+```
+
+##### Total
+22 rows, again, all from 2024
+```{r}
+Q1 <- quantile(yield_wk_FC$total_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_wk_FC$total_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_wk_FC$total_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_wk_FC, yield_wk_FC$total_g > upper_bound | 
+                    yield_wk_FC$total_g < lower_bound)
+```
+
+### Annual yield
+The outlier analysis for individual weeks is more important but doing it here for due diligence. 
+
+#### Strawberries
+
+##### Marketable
+There are no outliers
+```{r}
+Q1 <- quantile(yield_yr_AS$marketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_AS$marketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_AS$marketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_AS, yield_yr_AS$marketable_g > upper_bound | 
+                    yield_yr_AS$marketable_g < lower_bound)
+```
+
+##### Percent marketable
+
+Four potential outliers, all less than the lower_bound, but most are bare soil and seem to be due to low overall yields
+```{r}
+Q1 <- quantile(yield_yr_AS$per_market, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_AS$per_market, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_AS$per_market,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_AS, yield_yr_AS$per_market > upper_bound | 
+                    yield_yr_AS$per_market < lower_bound)
+```
+
+##### Unmarketable
+
+One potential outlier, but seems to just be a generally highly productive plot (and it isn't much higher than the upper bound)
+```{r}
+Q1 <- quantile(yield_yr_AS$unmarketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_AS$unmarketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_AS$unmarketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_AS, yield_yr_AS$unmarketable_g > upper_bound | 
+                    yield_yr_AS$unmarketable_g < lower_bound)
+```
+
+##### Total
+There are no outliers
+```{r}
+Q1 <- quantile(yield_yr_AS$total_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_AS$total_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_AS$total_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_AS, yield_yr_AS$total_g > upper_bound | 
+                    yield_yr_AS$total_g < lower_bound)
+```
+
+#### Beans
+
+##### Marketable
+There are no outliers
+```{r}
+Q1 <- quantile(yield_yr_DB$marketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_DB$marketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_FC$marketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_DB, yield_yr_DB$marketable_g > upper_bound | 
+                    yield_yr_DB$marketable_g < lower_bound)
+```
+
+##### Percent marketable
+
+Three potential outliers, all of which are just not 100%, which was the case for almost every plot
+```{r}
+Q1 <- quantile(yield_yr_DB$per_market, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_DB$per_market, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_DB$per_market,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_DB, yield_yr_DB$per_market > upper_bound | 
+                    yield_yr_DB$per_market < lower_bound)
+```
+
+##### Unmarketable
+Same three plots as above, not concerned
+```{r}
+Q1 <- quantile(yield_yr_DB$unmarketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_DB$unmarketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_DB$unmarketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_DB, yield_yr_DB$unmarketable_g > upper_bound | 
+                    yield_yr_DB$unmarketable_g < lower_bound)
+```
+
+##### Total
+There are no outliers
+```{r}
+Q1 <- quantile(yield_yr_DB$total_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_DB$total_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_DB$total_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_DB, yield_yr_DB$total_g > upper_bound | 
+                    yield_yr_DB$total_g < lower_bound)
+```
+
+#### Collards
+
+##### Marketable
+
+One potential outlier, in 2024, and I can tell you from memory that it was the plot with all the ridiculously large collard plants
+```{r}
+Q1 <- quantile(yield_yr_FC$marketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_FC$marketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_FC$marketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_FC, yield_yr_FC$marketable_g > upper_bound | 
+                    yield_yr_FC$marketable_g < lower_bound)
+```
+
+##### Percent marketable
+There are no outliers
+```{r}
+Q1 <- quantile(yield_yr_FC$per_market, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_FC$per_market, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_FC$per_market,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_FC, yield_yr_FC$per_market > upper_bound | 
+                    yield_yr_FC$per_market < lower_bound)
+```
+
+##### Unmarketable
+There are no outliers
+```{r}
+Q1 <- quantile(yield_yr_FC$unmarketable_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_FC$unmarketable_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_FC$unmarketable_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_FC, yield_yr_FC$unmarketable_g > upper_bound | 
+                    yield_yr_FC$unmarketable_g < lower_bound)
+```
+
+##### Total
+There are no outliers
+```{r}
+Q1 <- quantile(yield_yr_FC$total_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(yield_yr_FC$total_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(yield_yr_FC$total_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(yield_yr_FC, yield_yr_FC$total_g > upper_bound | 
+                    yield_yr_FC$total_g < lower_bound)
+```
+
+## Normality & Transformations
+I've kept the transformations that work in the main code, but moving over all the attempts so that they don't clog up the script
+
+### Weekly Yield
+NOTE: these dataframes only include data for dates when there was some sort of yield harvested. All the zero weeks have been removed. I did this because I know that if there was no harvest in 2023, then there was nothing for that week. But I'm less sure of that for 2024. I re-ran with the 0g total harvests included, and across the board, data transformations are not successful at achieving a normal distribution
+
+#### Strawberries
+
+##### Marketable yield
+
+The original dataset is non-parametric, with a lambda between 0 and 0.5 which indicates a log, sqrt, or boxcox transformation will be most appropriate. None achieves a normal distribution. If I run with the dataset that includes plots with 0g harvest, same.
+```{r}
+#original dataset
+hist(yield_wk_AS$marketable_g)
+skewness(yield_wk_AS$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_AS$marketable_g, main='Normal')
+qqline(yield_wk_AS$marketable_g)
+shapiro.test(yield_wk_AS$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_AS$marketable_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_AS$bc_marketable <- ((yield_wk_AS$marketable_g + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_AS$bc_marketable)
+skewness(yield_wk_AS$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_AS$bc_marketable, main='Normal')
+qqline(yield_wk_AS$bc_marketable)
+shapiro.test(yield_wk_AS$bc_marketable)
+
+#log
+yield_wk_AS$log_marketable <- log10(yield_wk_AS$marketable_g + 1)
+
+hist(yield_wk_AS$log_marketable)
+skewness(yield_wk_AS$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_AS$log_marketable, main='Normal')
+qqline(yield_wk_AS$log_marketable)
+shapiro.test(yield_wk_AS$log_marketable)
+
+#sqrt
+yield_wk_AS$sqrt_marketable <- sqrt(yield_wk_AS$marketable_g + 1)
+
+hist(yield_wk_AS$sqrt_marketable)
+skewness(yield_wk_AS$sqrt_marketable, na.rm = TRUE)
+qqnorm(yield_wk_AS$sqrt_marketable, main='Normal')
+qqline(yield_wk_AS$sqrt_marketable)
+shapiro.test(yield_wk_AS$sqrt_marketable)
+```
+
+2023 only: The original dataset is non-parametric, with a lambda between 0 and 0.5 which indicates a log, sqrt, or boxcox transformation will be most appropriate. The boxcox is the only one that achieves a normal distribution. If I run with the dataset that includes plots with 0g harvest, no transformation is successful
+```{r}
+#original dataset
+hist(yield_wk_23_AS$marketable_g)
+skewness(yield_wk_23_AS$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$marketable_g, main='Normal')
+qqline(yield_wk_23_AS$marketable_g)
+shapiro.test(yield_wk_23_AS$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_AS$marketable_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_AS$bc_marketable <- ((yield_wk_23_AS$marketable_g + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_23_AS$bc_marketable)
+skewness(yield_wk_23_AS$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$bc_marketable, main='Normal')
+qqline(yield_wk_23_AS$bc_marketable)
+shapiro.test(yield_wk_23_AS$bc_marketable)
+
+#log
+#yield_wk_23_AS$log_marketable <- log10(yield_wk_23_AS$marketable_g + 1)
+#shapiro.test(yield_wk_23_AS$log_marketable)
+
+#sqrt
+#yield_wk_23_AS$sqrt_marketable <- sqrt(yield_wk_23_AS$marketable_g + 1)
+#shapiro.test(yield_wk_23_AS$sqrt_marketable)
+```
+
+2024 only: The original dataset is non-parametric with a lambda close to 0, indicating a boxcox or log transformation will be most appropriate. Neither achieves a normal distribution. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_24_AS$marketable_g)
+skewness(yield_wk_24_AS$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$marketable_g, main='Normal')
+qqline(yield_wk_24_AS$marketable_g)
+shapiro.test(yield_wk_24_AS$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_AS$marketable_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_AS$bc_marketable <- ((yield_wk_24_AS$marketable_g + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_24_AS$bc_marketable)
+skewness(yield_wk_24_AS$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$bc_marketable, main='Normal')
+qqline(yield_wk_24_AS$bc_marketable)
+shapiro.test(yield_wk_24_AS$bc_marketable)
+
+#log
+yield_wk_24_AS$log_marketable <- log10(yield_wk_24_AS$marketable_g + 1)
+
+hist(yield_wk_24_AS$log_marketable)
+skewness(yield_wk_24_AS$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$log_marketable, main='Normal')
+qqline(yield_wk_24_AS$log_marketable)
+shapiro.test(yield_wk_24_AS$log_marketable)
+
+```
+
+
+
+##### Percent Marketable
+
+The original dataset is non-parametric, with a lambda between 1 and 2, indicating that a squared, cubic, or boxcox transformation would be most appropriate. None of them achieve a normal distribution, though. If I run with the dataset that includes plots with 0g harvest, same.
+```{r}
+#original dataset
+hist(yield_wk_AS$per_market)
+skewness(yield_wk_AS$per_market, na.rm = TRUE)
+qqnorm(yield_wk_AS$per_market, main='Normal')
+qqline(yield_wk_AS$per_market)
+shapiro.test(yield_wk_AS$per_market)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_AS$per_market + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_AS$bc_per <- ((yield_wk_AS$per_market + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_AS$bc_per)
+skewness(yield_wk_AS$bc_per, na.rm = TRUE)
+qqnorm(yield_wk_AS$bc_per, main='Normal')
+qqline(yield_wk_AS$bc_per)
+shapiro.test(yield_wk_AS$bc_per)
+
+#squared
+yield_wk_AS$sq_per <- (yield_wk_AS$per_market)^2
+
+hist(yield_wk_AS$sq_per)
+skewness(yield_wk_AS$sq_per, na.rm = TRUE)
+qqnorm(yield_wk_AS$sq_per, main='Normal')
+qqline(yield_wk_AS$sq_per)
+shapiro.test(yield_wk_AS$sq_per)
+
+#sqrt
+yield_wk_AS$cubic_per <- yield_wk_AS$per_market^3
+
+hist(yield_wk_AS$cubic_per)
+skewness(yield_wk_AS$cubic_per, na.rm = TRUE)
+qqnorm(yield_wk_AS$cubic_per, main='Normal')
+qqline(yield_wk_AS$cubic_per)
+shapiro.test(yield_wk_AS$cubic_per)
+```
+2023 only: The original dataset is non-parametric with a lambda of 2, indicating that a squared, cubic, or boxcox transformation would be most appropriate. None achieve a normal distribution. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_23_AS$per_market)
+skewness(yield_wk_23_AS$per_market, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$per_market, main='Normal')
+qqline(yield_wk_23_AS$per_market)
+shapiro.test(yield_wk_23_AS$per_market)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_AS$per_market + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_AS$bc_per <- ((yield_wk_23_AS$per_market + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_23_AS$bc_per)
+skewness(yield_wk_23_AS$bc_per, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$bc_per, main='Normal')
+qqline(yield_wk_23_AS$bc_per)
+shapiro.test(yield_wk_23_AS$bc_per)
+
+#squared
+yield_wk_23_AS$sq_per <- (yield_wk_23_AS$per_market)^2
+
+hist(yield_wk_23_AS$sq_per)
+skewness(yield_wk_23_AS$sq_per, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$sq_per, main='Normal')
+qqline(yield_wk_23_AS$sq_per)
+shapiro.test(yield_wk_23_AS$sq_per)
+
+#cubic
+yield_wk_23_AS$cubic_per <- yield_wk_23_AS$per_market^3
+
+hist(yield_wk_23_AS$cubic_per)
+skewness(yield_wk_23_AS$cubic_per, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$cubic_per, main='Normal')
+qqline(yield_wk_23_AS$cubic_per)
+shapiro.test(yield_wk_23_AS$cubic_per)
+```
+
+2024 only: The original dataset is non-parametric, with a lambda between 0.5 and 1 indicating that a sqrt or boxcox transformation would be most appropriate. Neither achieves a normal distribution. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_24_AS$per_market)
+skewness(yield_wk_24_AS$per_market, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$per_market, main='Normal')
+qqline(yield_wk_24_AS$per_market)
+shapiro.test(yield_wk_24_AS$per_market)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_AS$per_market + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_AS$bc_per <- ((yield_wk_24_AS$per_market + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_24_AS$bc_per)
+skewness(yield_wk_24_AS$bc_per, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$bc_per, main='Normal')
+qqline(yield_wk_24_AS$bc_per)
+shapiro.test(yield_wk_24_AS$bc_per)
+
+#sqrt
+yield_wk_AS$sqrt_per <- sqrt(yield_wk_AS$per_market)
+
+hist(yield_wk_AS$sqrt_per)
+skewness(yield_wk_AS$sqrt_per, na.rm = TRUE)
+qqnorm(yield_wk_AS$sqrt_per, main='Normal')
+qqline(yield_wk_AS$sqrt_per)
+shapiro.test(yield_wk_AS$sqrt_per)
+
+```
+
+
+##### Unmarketable yield
+
+The original dataset is non-parametric, with a lambda between -0.5 and 0 indicating an inverse sqrt, log, or boxcox would be most appropriate. None results in a normal distribution. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_AS$unmarketable_g)
+skewness(yield_wk_AS$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_wk_AS$unmarketable_g, main='Normal')
+qqline(yield_wk_AS$unmarketable_g)
+shapiro.test(yield_wk_AS$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_AS$unmarketable_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_AS$bc_unmarketable <- ((yield_wk_AS$unmarketable_g + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_AS$bc_unmarketable)
+skewness(yield_wk_AS$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_AS$bc_unmarketable, main='Normal')
+qqline(yield_wk_AS$bc_unmarketable)
+shapiro.test(yield_wk_AS$bc_unmarketable)
+
+#log
+yield_wk_AS$log_unmarketable <- log10(yield_wk_AS$unmarketable_g + 1)
+
+hist(yield_wk_AS$log_unmarketable)
+skewness(yield_wk_AS$log_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_AS$log_unmarketable, main='Normal')
+qqline(yield_wk_AS$log_unmarketable)
+shapiro.test(yield_wk_AS$log_unmarketable)
+
+#inverse sqrt
+yield_wk_AS$in_sqrt_unmarketable <- 1/sqrt(yield_wk_AS$unmarketable_g + 1)
+
+hist(yield_wk_AS$in_sqrt_unmarketable)
+skewness(yield_wk_AS$in_sqrt_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_AS$in_sqrt_unmarketable, main='Normal')
+qqline(yield_wk_AS$in_sqrt_unmarketable)
+shapiro.test(yield_wk_AS$in_sqrt_unmarketable)
+```
+
+2023 only: The original dataset is non-parametric, with a lambda between -0.5 and 0 indicating an inverse sqrt, log, or boxcox would be most appropriate. None results in a normal distribution. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_23_AS$unmarketable_g)
+skewness(yield_wk_23_AS$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$unmarketable_g, main='Normal')
+qqline(yield_wk_23_AS$unmarketable_g)
+shapiro.test(yield_wk_23_AS$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_AS$unmarketable_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_AS$bc_unmarketable <- ((yield_wk_23_AS$unmarketable_g + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_23_AS$bc_unmarketable)
+skewness(yield_wk_23_AS$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$bc_unmarketable, main='Normal')
+qqline(yield_wk_23_AS$bc_unmarketable)
+shapiro.test(yield_wk_23_AS$bc_unmarketable)
+
+#log
+yield_wk_23_AS$log_unmarketable <- log10(yield_wk_23_AS$unmarketable_g + 1)
+
+hist(yield_wk_23_AS$log_unmarketable)
+skewness(yield_wk_23_AS$log_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$log_unmarketable, main='Normal')
+qqline(yield_wk_23_AS$log_unmarketable)
+shapiro.test(yield_wk_23_AS$log_unmarketable)
+
+#inverse sqrt
+yield_wk_23_AS$in_sqrt_unmarketable <- 1/sqrt(yield_wk_23_AS$unmarketable_g + 1)
+
+hist(yield_wk_23_AS$in_sqrt_unmarketable)
+skewness(yield_wk_23_AS$in_sqrt_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$in_sqrt_unmarketable, main='Normal')
+qqline(yield_wk_23_AS$in_sqrt_unmarketable)
+shapiro.test(yield_wk_23_AS$in_sqrt_unmarketable)
+```
+
+2024 only:The original dataset is non-parametric, with a lambda between -0.5 and 0 indicating an inverse sqrt, log, or boxcox would be most appropriate. None results in a normal distribution. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_24_AS$unmarketable_g)
+skewness(yield_wk_24_AS$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$unmarketable_g, main='Normal')
+qqline(yield_wk_24_AS$unmarketable_g)
+shapiro.test(yield_wk_24_AS$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_AS$unmarketable_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_AS$bc_unmarketable <- ((yield_wk_24_AS$unmarketable_g + 1) ^ lambda -1)/lambda
+
+hist(yield_wk_24_AS$bc_unmarketable)
+skewness(yield_wk_24_AS$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$bc_unmarketable, main='Normal')
+qqline(yield_wk_24_AS$bc_unmarketable)
+shapiro.test(yield_wk_24_AS$bc_unmarketable)
+
+#log
+yield_wk_24_AS$log_unmarketable <- log10(yield_wk_24_AS$unmarketable_g + 1)
+
+hist(yield_wk_24_AS$log_unmarketable)
+skewness(yield_wk_24_AS$log_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$log_unmarketable, main='Normal')
+qqline(yield_wk_24_AS$log_unmarketable)
+shapiro.test(yield_wk_24_AS$log_unmarketable)
+
+#inverse sqrt
+yield_wk_24_AS$in_sqrt_unmarketable <- 1/sqrt(yield_wk_24_AS$unmarketable_g + 1)
+
+hist(yield_wk_24_AS$in_sqrt_unmarketable)
+skewness(yield_wk_24_AS$in_sqrt_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$in_sqrt_unmarketable, main='Normal')
+qqline(yield_wk_24_AS$in_sqrt_unmarketable)
+shapiro.test(yield_wk_24_AS$in_sqrt_unmarketable)
+```
+
+##### Total yield
+
+Overall: The dataset is non-parametric, with a lambda between 0 and 0.5 indicating that a log, sqrt, or boxcox transformation would be most appropriate. None of them are successfull though. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_AS$total_g)
+skewness(yield_wk_AS$total_g, na.rm = TRUE)
+qqnorm(yield_wk_AS$total_g, main='Normal')
+qqline(yield_wk_AS$total_g)
+shapiro.test(yield_wk_AS$total_g)
+
+#boxcox
+bc <- boxcox(lm(yield_wk_AS$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_AS$bc_total <- (yield_wk_AS$total_g ^ lambda -1)/lambda
+
+hist(yield_wk_AS$bc_total)
+skewness(yield_wk_AS$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_AS$bc_total, main='Normal')
+qqline(yield_wk_AS$bc_total)
+shapiro.test(yield_wk_AS$bc_total)
+
+#log
+yield_wk_AS$log_total <- log10(yield_wk_AS$total_g)
+
+hist(yield_wk_AS$log_total)
+skewness(yield_wk_AS$log_total, na.rm = TRUE)
+qqnorm(yield_wk_AS$log_total, main='Normal')
+qqline(yield_wk_AS$log_total)
+shapiro.test(yield_wk_AS$log_total)
+
+#sqrt
+yield_wk_AS$sqrt_total <- sqrt(yield_wk_AS$total_g)
+
+hist(yield_wk_AS$sqrt_total)
+skewness(yield_wk_AS$sqrt_total, na.rm = TRUE)
+qqnorm(yield_wk_AS$sqrt_total, main='Normal')
+qqline(yield_wk_AS$sqrt_total)
+shapiro.test(yield_wk_AS$sqrt_total)
+```
+
+2023 only: The dataset is non-parametric, with a lambda between 0 and 0.5 indicating that a log, sqrt, or boxcox transformation would be most appropriate. The box cox manages it! If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+#original dataset
+hist(yield_wk_23_AS$total_g)
+skewness(yield_wk_23_AS$total_g, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$total_g, main='Normal')
+qqline(yield_wk_23_AS$total_g)
+shapiro.test(yield_wk_23_AS$total_g)
+
+#boxcox
+bc <- boxcox(lm(yield_wk_23_AS$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_AS$bc_total <- (yield_wk_23_AS$total_g ^ lambda -1)/lambda
+
+hist(yield_wk_23_AS$bc_total)
+skewness(yield_wk_23_AS$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$bc_total, main='Normal')
+qqline(yield_wk_23_AS$bc_total)
+shapiro.test(yield_wk_23_AS$bc_total)
+
+#log
+yield_wk_23_AS$log_total <- log10(yield_wk_23_AS$total_g)
+
+hist(yield_wk_23_AS$log_total)
+skewness(yield_wk_23_AS$log_total, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$log_total, main='Normal')
+qqline(yield_wk_23_AS$log_total)
+shapiro.test(yield_wk_23_AS$log_total)
+
+#sqrt
+yield_wk_23_AS$sqrt_total <- sqrt(yield_wk_23_AS$total_g)
+
+hist(yield_wk_23_AS$sqrt_total)
+skewness(yield_wk_23_AS$sqrt_total, na.rm = TRUE)
+qqnorm(yield_wk_23_AS$sqrt_total, main='Normal')
+qqline(yield_wk_23_AS$sqrt_total)
+shapiro.test(yield_wk_23_AS$sqrt_total)
+```
+
+2024 only: The dataset is non-parametric, with a lambda between 0 and 0.5 indicating that a log, sqrt, or boxcox transformation would be most appropriate. The box cox manages it! If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+#original dataset
+hist(yield_wk_24_AS$total_g)
+skewness(yield_wk_24_AS$total_g, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$total_g, main='Normal')
+qqline(yield_wk_24_AS$total_g)
+shapiro.test(yield_wk_24_AS$total_g)
+
+#boxcox
+bc <- boxcox(lm(yield_wk_24_AS$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_AS$bc_total <- (yield_wk_24_AS$total_g ^ lambda -1)/lambda
+
+hist(yield_wk_24_AS$bc_total)
+skewness(yield_wk_24_AS$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$bc_total, main='Normal')
+qqline(yield_wk_24_AS$bc_total)
+shapiro.test(yield_wk_24_AS$bc_total)
+
+#log
+yield_wk_24_AS$log_total <- log10(yield_wk_24_AS$total_g)
+
+hist(yield_wk_24_AS$log_total)
+skewness(yield_wk_24_AS$log_total, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$log_total, main='Normal')
+qqline(yield_wk_24_AS$log_total)
+shapiro.test(yield_wk_24_AS$log_total)
+
+#sqrt
+yield_wk_24_AS$sqrt_total <- sqrt(yield_wk_24_AS$total_g)
+
+hist(yield_wk_24_AS$sqrt_total)
+skewness(yield_wk_24_AS$sqrt_total, na.rm = TRUE)
+qqnorm(yield_wk_24_AS$sqrt_total, main='Normal')
+qqline(yield_wk_24_AS$sqrt_total)
+shapiro.test(yield_wk_24_AS$sqrt_total)
+```
+
+#### Beans
+##### Marketable yield
+
+The original dataset is nonparametric with a lambda between 0 and 0.5, indicating that a boxcox, log, or sqrt transformation will be most appropriate. The boxcox is the only one that achieves a normal distribution. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_DB$marketable_g)
+skewness(yield_wk_DB$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_DB$marketable_g, main='Normal')
+qqline(yield_wk_DB$marketable_g)
+shapiro.test(yield_wk_DB$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_DB$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_DB$bc_marketable <- ((yield_wk_DB$marketable_g) ^ lambda -1)/lambda
+
+hist(yield_wk_DB$bc_marketable)
+skewness(yield_wk_DB$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_DB$bc_marketable, main='Normal')
+qqline(yield_wk_DB$bc_marketable)
+shapiro.test(yield_wk_DB$bc_marketable)
+
+#log
+yield_wk_DB$log_marketable <- log10(yield_wk_DB$marketable_g)
+
+hist(yield_wk_DB$log_marketable)
+skewness(yield_wk_DB$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_DB$log_marketable, main='Normal')
+qqline(yield_wk_DB$log_marketable)
+shapiro.test(yield_wk_DB$log_marketable)
+
+# sqrt
+yield_wk_DB$sqrt_marketable <- sqrt(yield_wk_DB$marketable_g)
+
+hist(yield_wk_DB$sqrt_marketable)
+skewness(yield_wk_DB$sqrt_marketable, na.rm = TRUE)
+qqnorm(yield_wk_DB$sqrt_marketable, main='Normal')
+qqline(yield_wk_DB$sqrt_marketable)
+shapiro.test(yield_wk_DB$sqrt_marketable)
+
+```
+
+2023 only - original dataset is non-parametric with a lambda close to 0 indicating a boxcox or log will be most appropriate. Boxcox is successful. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_23_DB$marketable_g)
+skewness(yield_wk_23_DB$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_23_DB$marketable_g, main='Normal')
+qqline(yield_wk_23_DB$marketable_g)
+shapiro.test(yield_wk_23_DB$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_DB$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_DB$bc_marketable <- ((yield_wk_23_DB$marketable_g) ^ lambda -1)/lambda
+
+hist(yield_wk_23_DB$bc_marketable)
+skewness(yield_wk_23_DB$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_23_DB$bc_marketable, main='Normal')
+qqline(yield_wk_23_DB$bc_marketable)
+shapiro.test(yield_wk_23_DB$bc_marketable)
+
+#log
+yield_wk_23_DB$log_marketable <- log10(yield_wk_23_DB$marketable_g)
+
+hist(yield_wk_23_DB$log_marketable)
+skewness(yield_wk_23_DB$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_23_DB$log_marketable, main='Normal')
+qqline(yield_wk_23_DB$log_marketable)
+shapiro.test(yield_wk_23_DB$log_marketable)
+
+
+```
+
+2024 only - original dataset is non-parametric with a lambda close to 0 indicating a boxcox or log will be most appropriate. Both are successful, but boxcox has the better distribution. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_24_DB$marketable_g)
+skewness(yield_wk_24_DB$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_24_DB$marketable_g, main='Normal')
+qqline(yield_wk_24_DB$marketable_g)
+shapiro.test(yield_wk_24_DB$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_DB$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_DB$bc_marketable <- ((yield_wk_24_DB$marketable_g) ^ lambda -1)/lambda
+
+hist(yield_wk_24_DB$bc_marketable)
+skewness(yield_wk_24_DB$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_24_DB$bc_marketable, main='Normal')
+qqline(yield_wk_24_DB$bc_marketable)
+shapiro.test(yield_wk_24_DB$bc_marketable)
+
+#log
+yield_wk_24_DB$log_marketable <- log10(yield_wk_24_DB$marketable_g)
+
+hist(yield_wk_24_DB$log_marketable)
+skewness(yield_wk_24_DB$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_24_DB$log_marketable, main='Normal')
+qqline(yield_wk_24_DB$log_marketable)
+shapiro.test(yield_wk_24_DB$log_marketable)
+
+
+```
+
+##### Percent marketable
+
+Based on experience of this from the annual yield, I'm not even going to try - there is no normal distribution for this dataset. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+
+#original dataset
+hist(yield_wk_DB$per_market)
+skewness(yield_wk_DB$per_market, na.rm = TRUE)
+qqnorm(yield_wk_DB$per_market, main='Normal')
+qqline(yield_wk_DB$per_market)
+shapiro.test(yield_wk_DB$per_market)
+bc <- boxcox(lm((yield_wk_DB$per_market) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+
+
+```
+
+2023 only - lol they are all 100% so nope. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+
+#original dataset
+hist(yield_wk_23_DB$per_market)
+skewness(yield_wk_23_DB$per_market, na.rm = TRUE)
+qqnorm(yield_wk_23_DB$per_market, main='Normal')
+qqline(yield_wk_23_DB$per_market)
+
+```
+
+2024 only - there is no transformation that will make this a normal distribution. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_24_DB$per_market)
+skewness(yield_wk_24_DB$per_market, na.rm = TRUE)
+qqnorm(yield_wk_24_DB$per_market, main='Normal')
+qqline(yield_wk_24_DB$per_market)
+shapiro.test(yield_wk_24_DB$per_market)
+bc <- boxcox(lm((yield_wk_24_DB$per_market) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+
+```
+
+##### Unmarketable yield
+Based on analysis from year, I know that this data can't have a normal distribution so not spending the time even adding code. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+hist(yield_wk_DB$unmarketable_g)
+skewness(yield_wk_DB$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_wk_DB$unmarketable_g, main='Normal')
+qqline(yield_wk_DB$unmarketable_g)
+shapiro.test(yield_wk_DB$unmarketable_g)
+
+```
+
+##### Total yield
+The original dataset is nonparametric with a lambda near 0 indicating a boxcox or log transformation will be most appropriate. Boxcox is successful. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_DB$total_g)
+skewness(yield_wk_DB$total_g, na.rm = TRUE)
+qqnorm(yield_wk_DB$total_g, main='Normal')
+qqline(yield_wk_DB$total_g)
+shapiro.test(yield_wk_DB$total_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_DB$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_DB$bc_total <- ((yield_wk_DB$total_g) ^ lambda -1)/lambda
+
+hist(yield_wk_DB$bc_total)
+skewness(yield_wk_DB$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_DB$bc_total, main='Normal')
+qqline(yield_wk_DB$bc_total)
+shapiro.test(yield_wk_DB$bc_total)
+
+#log
+yield_wk_DB$log_total <- log10(yield_wk_DB$total_g)
+
+hist(yield_wk_DB$log_total)
+skewness(yield_wk_DB$log_total, na.rm = TRUE)
+qqnorm(yield_wk_DB$log_total, main='Normal')
+qqline(yield_wk_DB$log_total)
+shapiro.test(yield_wk_DB$log_total)
+
+```
+
+2023 only - The original dataset is nonparametric with a lambda near 0 indicating a boxcox or log transformation will be most appropriate. Boxcox is successful. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_23_DB$total_g)
+skewness(yield_wk_23_DB$total_g, na.rm = TRUE)
+qqnorm(yield_wk_23_DB$total_g, main='Normal')
+qqline(yield_wk_23_DB$total_g)
+shapiro.test(yield_wk_23_DB$total_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_DB$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_DB$bc_total <- ((yield_wk_23_DB$total_g) ^ lambda -1)/lambda
+
+hist(yield_wk_23_DB$bc_total)
+skewness(yield_wk_23_DB$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_23_DB$bc_total, main='Normal')
+qqline(yield_wk_23_DB$bc_total)
+shapiro.test(yield_wk_23_DB$bc_total)
+
+#log
+yield_wk_23_DB$log_total <- log10(yield_wk_23_DB$total_g)
+
+hist(yield_wk_23_DB$log_total)
+skewness(yield_wk_23_DB$log_total, na.rm = TRUE)
+qqnorm(yield_wk_23_DB$log_total, main='Normal')
+qqline(yield_wk_23_DB$log_total)
+shapiro.test(yield_wk_23_DB$log_total)
+
+```
+
+2024 only - The original dataset is nonparametric with a lambda near 0 indicating a boxcox or log transformation will be most appropriate. Boxcox is successful. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_24_DB$total_g)
+skewness(yield_wk_24_DB$total_g, na.rm = TRUE)
+qqnorm(yield_wk_24_DB$total_g, main='Normal')
+qqline(yield_wk_24_DB$total_g)
+shapiro.test(yield_wk_24_DB$total_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_DB$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_DB$bc_total <- ((yield_wk_24_DB$total_g) ^ lambda -1)/lambda
+
+hist(yield_wk_24_DB$bc_total)
+skewness(yield_wk_24_DB$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_24_DB$bc_total, main='Normal')
+qqline(yield_wk_24_DB$bc_total)
+shapiro.test(yield_wk_24_DB$bc_total)
+
+#log
+yield_wk_24_DB$log_total <- log10(yield_wk_24_DB$total_g)
+
+hist(yield_wk_24_DB$log_total)
+skewness(yield_wk_24_DB$log_total, na.rm = TRUE)
+qqnorm(yield_wk_24_DB$log_total, main='Normal')
+qqline(yield_wk_24_DB$log_total)
+shapiro.test(yield_wk_24_DB$log_total)
+
+```
+
+
+#### Collards
+
+##### Marketable yield
+
+The original dataset is non-parametric with a lambda near 0, indicating a boxcox or log transformation would be most appropriate. Boxcox is just barely successful. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_FC$marketable_g)
+skewness(yield_wk_FC$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_FC$marketable_g, main='Normal')
+qqline(yield_wk_FC$marketable_g)
+shapiro.test(yield_wk_FC$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_FC$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_FC$bc_marketable <- ((yield_wk_FC$marketable_g) ^ lambda -1)/lambda
+
+hist(yield_wk_FC$bc_marketable)
+skewness(yield_wk_FC$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_FC$bc_marketable, main='Normal')
+qqline(yield_wk_FC$bc_marketable)
+shapiro.test(yield_wk_FC$bc_marketable)
+
+#log
+yield_wk_FC$log_marketable <- log10(yield_wk_FC$marketable_g)
+
+hist(yield_wk_FC$log_marketable)
+skewness(yield_wk_FC$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_FC$log_marketable, main='Normal')
+qqline(yield_wk_FC$log_marketable)
+shapiro.test(yield_wk_FC$log_marketable)
+
+```
+
+
+2023 only - The dataset is nonparametric, with a lambda between 0 and 0.5 indicating that boxcox or log would be most appropriate. Neither is successful. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+
+#original dataset
+hist(yield_wk_23_FC$marketable_g)
+skewness(yield_wk_23_FC$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$marketable_g, main='Normal')
+qqline(yield_wk_23_FC$marketable_g)
+shapiro.test(yield_wk_23_FC$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_FC$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_FC$bc_marketable <- ((yield_wk_23_FC$marketable_g) ^ lambda -1)/lambda
+
+hist(yield_wk_23_FC$bc_marketable)
+skewness(yield_wk_23_FC$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$bc_marketable, main='Normal')
+qqline(yield_wk_23_FC$bc_marketable)
+shapiro.test(yield_wk_23_FC$bc_marketable)
+
+#log
+yield_wk_23_FC$log_marketable <- log10(yield_wk_23_FC$marketable_g)
+
+hist(yield_wk_23_FC$log_marketable)
+skewness(yield_wk_23_FC$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$log_marketable, main='Normal')
+qqline(yield_wk_23_FC$log_marketable)
+shapiro.test(yield_wk_23_FC$log_marketable)
+
+#sqrt
+yield_wk_23_FC$sqrt_marketable <- sqrt(yield_wk_23_FC$marketable_g)
+
+hist(yield_wk_23_FC$sqrt_marketable)
+skewness(yield_wk_23_FC$sqrt_marketable, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$sqrt_marketable, main='Normal')
+qqline(yield_wk_23_FC$sqrt_marketable)
+shapiro.test(yield_wk_23_FC$sqrt_marketable)
+
+```
+
+2024 only - The dataset is nonparametric, with a lambda near 0 indicating that boxcox or log would be most appropriate. Both work, and have similar distributions. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_24_FC$marketable_g)
+skewness(yield_wk_24_FC$marketable_g, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$marketable_g, main='Normal')
+qqline(yield_wk_24_FC$marketable_g)
+shapiro.test(yield_wk_24_FC$marketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_FC$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_FC$bc_marketable <- ((yield_wk_24_FC$marketable_g) ^ lambda -1)/lambda
+
+hist(yield_wk_24_FC$bc_marketable)
+skewness(yield_wk_24_FC$bc_marketable, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$bc_marketable, main='Normal')
+qqline(yield_wk_24_FC$bc_marketable)
+shapiro.test(yield_wk_24_FC$bc_marketable)
+
+#log
+yield_wk_24_FC$log_marketable <- log10(yield_wk_24_FC$marketable_g)
+
+hist(yield_wk_24_FC$log_marketable)
+skewness(yield_wk_24_FC$log_marketable, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$log_marketable, main='Normal')
+qqline(yield_wk_24_FC$log_marketable)
+shapiro.test(yield_wk_24_FC$log_marketable)
+
+
+```
+
+##### Percent marketable
+The original dataset is non-parametric and has a lambda of 1.5, indicating a boxcox or square tranformation might be most appropriate. None are successful. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_FC$per_market)
+skewness(yield_wk_FC$per_market, na.rm = TRUE)
+qqnorm(yield_wk_FC$per_market, main='Normal')
+qqline(yield_wk_FC$per_market)
+shapiro.test(yield_wk_FC$per_market)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_FC$per_market) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_FC$bc_per <- ((yield_wk_FC$per_market) ^ lambda -1)/lambda
+
+hist(yield_wk_FC$bc_per)
+skewness(yield_wk_FC$bc_per, na.rm = TRUE)
+qqnorm(yield_wk_FC$bc_per, main='Normal')
+qqline(yield_wk_FC$bc_per)
+shapiro.test(yield_wk_FC$bc_per)
+
+#square
+yield_wk_FC$sq_per <- (yield_wk_FC$per_market)^2
+
+hist(yield_wk_FC$sq_per)
+skewness(yield_wk_FC$sq_per, na.rm = TRUE)
+qqnorm(yield_wk_FC$sq_per, main='Normal')
+qqline(yield_wk_FC$sq_per)
+shapiro.test(yield_wk_FC$sq_per)
+
+```
+
+2023 only: The original dataset is non-parametric and has a lambda near 2, indicating a boxcox or square tranformation might be most appropriate. None are successful. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+
+#original dataset
+hist(yield_wk_23_FC$per_market)
+skewness(yield_wk_23_FC$per_market, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$per_market, main='Normal')
+qqline(yield_wk_23_FC$per_market)
+shapiro.test(yield_wk_23_FC$per_market)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_FC$per_market) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_FC$bc_per <- ((yield_wk_23_FC$per_market) ^ lambda -1)/lambda
+
+hist(yield_wk_23_FC$bc_per)
+skewness(yield_wk_23_FC$bc_per, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$bc_per, main='Normal')
+qqline(yield_wk_23_FC$bc_per)
+shapiro.test(yield_wk_23_FC$bc_per)
+
+#square
+yield_wk_23_FC$sq_per <- (yield_wk_23_FC$per_market)^2
+
+hist(yield_wk_23_FC$sq_per)
+skewness(yield_wk_23_FC$sq_per, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$sq_per, main='Normal')
+qqline(yield_wk_23_FC$sq_per)
+shapiro.test(yield_wk_23_FC$sq_per)
+
+```
+
+2024 only: The original dataset is non-parametric and has a lambda near 1, indicating a boxcox tranformation might be most appropriate. it is not successful. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+
+#original dataset
+hist(yield_wk_24_FC$per_market)
+skewness(yield_wk_24_FC$per_market, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$per_market, main='Normal')
+qqline(yield_wk_24_FC$per_market)
+shapiro.test(yield_wk_24_FC$per_market)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_FC$per_market) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_FC$bc_per <- ((yield_wk_24_FC$per_market) ^ lambda -1)/lambda
+
+hist(yield_wk_24_FC$bc_per)
+skewness(yield_wk_24_FC$bc_per, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$bc_per, main='Normal')
+qqline(yield_wk_24_FC$bc_per)
+shapiro.test(yield_wk_24_FC$bc_per)
+
+
+```
+
+##### Unmarketable yield
+
+The original dataset is non-parametric with a lambda near 0 indicating a boxcox or log transformation would be most appropriate. Neither is successful. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_FC$unmarketable_g)
+skewness(yield_wk_FC$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_wk_FC$unmarketable_g, main='Normal')
+qqline(yield_wk_FC$unmarketable_g)
+shapiro.test(yield_wk_FC$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_FC$unmarketable_g+1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_FC$bc_unmarketable <- ((yield_wk_FC$unmarketable_g+1) ^ lambda -1)/lambda
+
+hist(yield_wk_FC$bc_unmarketable)
+skewness(yield_wk_FC$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_FC$bc_unmarketable, main='Normal')
+qqline(yield_wk_FC$bc_unmarketable)
+shapiro.test(yield_wk_FC$bc_unmarketable)
+
+#log
+yield_wk_FC$log_market <- log(yield_wk_FC$unmarketable_g+1)
+
+hist(yield_wk_FC$log_market)
+skewness(yield_wk_FC$log_market, na.rm = TRUE)
+qqnorm(yield_wk_FC$log_market, main='Normal')
+qqline(yield_wk_FC$log_market)
+shapiro.test(yield_wk_FC$log_market)
+
+```
+
+2023 only: The original dataset is non-parametric with a lambda near 0 indicating a boxcox or log transformation would be most appropriate. Neither is successful. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_23_FC$unmarketable_g)
+skewness(yield_wk_23_FC$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$unmarketable_g, main='Normal')
+qqline(yield_wk_23_FC$unmarketable_g)
+shapiro.test(yield_wk_23_FC$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_FC$unmarketable_g+1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_FC$bc_unmarketable <- ((yield_wk_23_FC$unmarketable_g+1) ^ lambda -1)/lambda
+
+hist(yield_wk_23_FC$bc_unmarketable)
+skewness(yield_wk_23_FC$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$bc_unmarketable, main='Normal')
+qqline(yield_wk_23_FC$bc_unmarketable)
+shapiro.test(yield_wk_23_FC$bc_unmarketable)
+
+#log
+yield_wk_23_FC$log_market <- log(yield_wk_23_FC$unmarketable_g+1)
+
+hist(yield_wk_23_FC$log_market)
+skewness(yield_wk_23_FC$log_market, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$log_market, main='Normal')
+qqline(yield_wk_23_FC$log_market)
+shapiro.test(yield_wk_23_FC$log_market)
+
+```
+
+2024 only: The original dataset is non-parametric with a lambda near 0 indicating a boxcox or log transformation would be most appropriate. Neither is successful. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+#original dataset
+hist(yield_wk_24_FC$unmarketable_g)
+skewness(yield_wk_24_FC$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$unmarketable_g, main='Normal')
+qqline(yield_wk_24_FC$unmarketable_g)
+shapiro.test(yield_wk_24_FC$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_FC$unmarketable_g+1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_FC$bc_unmarketable <- ((yield_wk_24_FC$unmarketable_g+1) ^ lambda -1)/lambda
+
+hist(yield_wk_24_FC$bc_unmarketable)
+skewness(yield_wk_24_FC$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$bc_unmarketable, main='Normal')
+qqline(yield_wk_24_FC$bc_unmarketable)
+shapiro.test(yield_wk_24_FC$bc_unmarketable)
+
+#log
+yield_wk_24_FC$log_market <- log(yield_wk_24_FC$unmarketable_g+1)
+
+hist(yield_wk_24_FC$log_market)
+skewness(yield_wk_24_FC$log_market, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$log_market, main='Normal')
+qqline(yield_wk_24_FC$log_market)
+shapiro.test(yield_wk_24_FC$log_market)
+
+```
+
+##### Total yield
+
+The original dataset is non-parametric with a lambda between 0 and -0.5 indicating that a boxcox, log, or inverse sqrt transformation would be most appropriate. Only the boxcox is successful. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_FC$total_g)
+skewness(yield_wk_FC$total_g, na.rm = TRUE)
+qqnorm(yield_wk_FC$total_g, main='Normal')
+qqline(yield_wk_FC$total_g)
+shapiro.test(yield_wk_FC$total_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_FC$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_FC$bc_total <- ((yield_wk_FC$total_g) ^ lambda -1)/lambda
+
+hist(yield_wk_FC$bc_total)
+skewness(yield_wk_FC$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_FC$bc_total, main='Normal')
+qqline(yield_wk_FC$bc_total)
+shapiro.test(yield_wk_FC$bc_total)
+
+#log
+yield_wk_FC$log_total <- log10(yield_wk_FC$total_g)
+
+hist(yield_wk_FC$log_total)
+skewness(yield_wk_FC$log_total, na.rm = TRUE)
+qqnorm(yield_wk_FC$log_total, main='Normal')
+qqline(yield_wk_FC$log_total)
+shapiro.test(yield_wk_FC$log_total)
+
+#sqrt
+yield_wk_FC$sqrt_total <- 1/sqrt(yield_wk_FC$total_g)
+
+hist(yield_wk_FC$sqrt_total)
+skewness(yield_wk_FC$sqrt_total, na.rm = TRUE)
+qqnorm(yield_wk_FC$sqrt_total, main='Normal')
+qqline(yield_wk_FC$sqrt_total)
+shapiro.test(yield_wk_FC$sqrt_total)
+
+```
+
+
+2023 only: The original dataset is non-parametric with a lambda near 0 indicating that a boxcox or log transformation would be most appropriate. Neither is successful. If I run with the dataset that includes plots with 0g harvest, same
+```{r}
+
+#original dataset
+hist(yield_wk_23_FC$total_g)
+skewness(yield_wk_23_FC$total_g, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$total_g, main='Normal')
+qqline(yield_wk_23_FC$total_g)
+shapiro.test(yield_wk_23_FC$total_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_23_FC$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_FC$bc_total <- ((yield_wk_23_FC$total_g) ^ lambda -1)/lambda
+
+hist(yield_wk_23_FC$bc_total)
+skewness(yield_wk_23_FC$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$bc_total, main='Normal')
+qqline(yield_wk_23_FC$bc_total)
+shapiro.test(yield_wk_23_FC$bc_total)
+
+#log
+yield_wk_23_FC$log_total <- log10(yield_wk_23_FC$total_g)
+
+hist(yield_wk_23_FC$log_total)
+skewness(yield_wk_23_FC$log_total, na.rm = TRUE)
+qqnorm(yield_wk_23_FC$log_total, main='Normal')
+qqline(yield_wk_23_FC$log_total)
+shapiro.test(yield_wk_23_FC$log_total)
+
+
+```
+2024 only: The original dataset is non-parametric with a lambda near 0 indicating that a boxcox or log transformation would be most appropriate. Both are successful, and the boxcox has a slightly better distribution. If I run with the dataset that includes plots with 0g harvest, transformation does not achieve normal distribution
+```{r}
+
+#original dataset
+hist(yield_wk_24_FC$total_g)
+skewness(yield_wk_24_FC$total_g, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$total_g, main='Normal')
+qqline(yield_wk_24_FC$total_g)
+shapiro.test(yield_wk_24_FC$total_g)
+
+#boxcox
+bc <- boxcox(lm((yield_wk_24_FC$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_FC$bc_total <- ((yield_wk_24_FC$total_g) ^ lambda -1)/lambda
+
+hist(yield_wk_24_FC$bc_total)
+skewness(yield_wk_24_FC$bc_total, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$bc_total, main='Normal')
+qqline(yield_wk_24_FC$bc_total)
+shapiro.test(yield_wk_24_FC$bc_total)
+
+#log
+yield_wk_24_FC$log_total <- log10(yield_wk_24_FC$total_g)
+
+hist(yield_wk_24_FC$log_total)
+skewness(yield_wk_24_FC$log_total, na.rm = TRUE)
+qqnorm(yield_wk_24_FC$log_total, main='Normal')
+qqline(yield_wk_24_FC$log_total)
+shapiro.test(yield_wk_24_FC$log_total)
+
+
+```
+
+### Annual Yield
+
+#### Strawberries
+##### Marketable yield
+
+The original dataset is non-parametric. Boxcox function shows that lambda is between 0 and 0.5, indicating that log, sqrt, or boxcox transformations would be appropriate. Boxcox is the only one that achieves a normal distribution (p = 0.05), just barely.
+
+```{r}
+# original dataset
+hist(yield_yr_AS$marketable_g)
+skewness(yield_yr_AS$marketable_g, na.rm = TRUE)
+qqnorm(yield_yr_AS$marketable_g, main='Normal')
+qqline(yield_yr_AS$marketable_g)
+shapiro.test(yield_yr_AS$marketable_g)
+
+#boxcox transformation
+bc <- boxcox(lm(yield_yr_AS$marketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_yr_AS$bc_marketable <- (yield_yr_AS$marketable_g ^ lambda -1)/lambda
+
+hist(yield_yr_AS$bc_marketable)
+skewness(yield_yr_AS$bc_marketable, na.rm = TRUE)
+qqnorm(yield_yr_AS$bc_marketable, main='Normal')
+qqline(yield_yr_AS$bc_marketable)
+shapiro.test(yield_yr_AS$bc_marketable)
+
+# log transformation
+# yield_yr_AS$log_marketable <- log10(yield_yr_AS$marketable_g)
+# shapiro.test(yield_yr_AS$log_marketable)
+
+# sqrt transformation
+# yield_yr_AS$sqrt_marketable <- sqrt(yield_yr_AS$marketable_g)
+#shapiro.test(yield_yr_AS$sqrt_marketable)
+
+```
+2023 only: normal distribution
+
+```{r}
+# original dataset
+hist(yield_23_AS$marketable_g)
+skewness(yield_23_AS$marketable_g, na.rm = TRUE)
+qqnorm(yield_23_AS$marketable_g, main='Normal')
+qqline(yield_23_AS$marketable_g)
+shapiro.test(yield_23_AS$marketable_g)
+
+```
+2024 only: normal distribution
+
+```{r}
+# original dataset
+hist(yield_24_AS$marketable_g)
+skewness(yield_24_AS$marketable_g, na.rm = TRUE)
+qqnorm(yield_24_AS$marketable_g, main='Normal')
+qqline(yield_24_AS$marketable_g)
+shapiro.test(yield_24_AS$marketable_g)
+
+```
+
+##### Percent marketable
+
+The original dataset is non-parametric. The lambda is over 2, indicating the boxcox or square transformation will likely be best; I'll also try cubic. However, no transformation strategy successfully achieves a normal distribution; the squared is closest.
+
+```{r}
+# original dataset
+hist(yield_yr_AS$per_market)
+skewness(yield_yr_AS$per_market, na.rm = TRUE)
+qqnorm(yield_yr_AS$per_market, main='Normal')
+qqline(yield_yr_AS$per_market)
+shapiro.test(yield_yr_AS$per_market)
+
+#boxcox transformation
+#bc <- boxcox(lm(yield_yr_AS$per_market ~ 1))
+#lambda <- bc$x[which.max(bc$y)]
+#yield_yr_AS$bc_per <- (yield_yr_AS$per_market ^ lambda -1)/lambda
+#shapiro.test(yield_yr_AS$bc_per)
+
+# squared transformation
+# yield_yr_AS$sq_marketable <- (yield_yr_AS$marketable_g)^2
+# shapiro.test(yield_yr_AS$sq_marketable)
+
+# cubic transformation
+# yield_yr_AS$cube_marketable <- (yield_yr_AS$marketable_g)^3
+# shapiro.test(yield_yr_AS$cube_marketable)
+
+```
+2023 only: normal distribution
+
+```{r}
+# original dataset
+
+hist(yield_23_AS$per_market)
+skewness(yield_23_AS$per_market, na.rm = TRUE)
+qqnorm(yield_23_AS$per_market, main='Normal')
+qqline(yield_23_AS$per_market)
+shapiro.test(yield_23_AS$per_market)
+
+```
+2024 only: The original dataset is non-parametric. The lambda is about 2, indiciating that boxcox or squared or cubic will be the best transformation strategy. None achieve a normal distribution, but the cubic is best (p = 0.03). Boxcox isn't far behind, for consistency (p = 0.02). BUT, I tried an ANOVA with the cubic transformation, and model assumptions were not met
+
+```{r}
+# original dataset
+hist(yield_24_AS$per_market)
+skewness(yield_24_AS$per_market, na.rm = TRUE)
+qqnorm(yield_24_AS$per_market, main='Normal')
+qqline(yield_24_AS$per_market)
+shapiro.test(yield_24_AS$per_market)
+
+#boxcox transformation
+# bc <- boxcox(lm(yield_24_AS$per_market ~ 1))
+# lambda <- bc$x[which.max(bc$y)]
+# yield_24_AS$bc_per <- (yield_24_AS$per_market ^ lambda -1)/lambda
+# shapiro.test(yield_24_AS$bc_per)
+
+#squared
+# yield_24_AS$sq_per <- (yield_24_AS$per_market)^2
+# shapiro.test(yield_24_AS$sq_per)
+
+#cubic
+# yield_24_AS$cubic_per <- (yield_24_AS$per_market)^3
+# shapiro.test(yield_24_AS$cubic_per)
+```
+
+##### Unmarketable yield
+
+The original dataset is not normally distributed. Lambda is close to 0, indicating that box cox or log would be best transformations. Both have a similar quality and achieve a normal distribution
+```{r}
+#original dataset
+hist(yield_yr_AS$unmarketable_g)
+skewness(yield_yr_AS$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_yr_AS$unmarketable_g, main='Normal')
+qqline(yield_yr_AS$unmarketable_g)
+shapiro.test(yield_yr_AS$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm(yield_yr_AS$unmarketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_yr_AS$bc_unmarketable <- (yield_yr_AS$unmarketable_g ^ lambda -1)/lambda
+
+hist(yield_yr_AS$bc_unmarketable)
+skewness(yield_yr_AS$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_yr_AS$bc_unmarketable, main='Normal')
+qqline(yield_yr_AS$bc_unmarketable)
+shapiro.test(yield_yr_AS$bc_unmarketable)
+
+#log
+#yield_yr_AS$log_market <- log10(yield_yr_AS$unmarketable_g)
+#shapiro.test(yield_yr_AS$log_market)
+
+```
+
+2023 only: normal distribution
+
+```{r}
+# original dataset
+hist(yield_23_AS$unmarketable_g)
+skewness(yield_23_AS$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_23_AS$unmarketable_g, main='Normal')
+qqline(yield_23_AS$unmarketable_g)
+shapiro.test(yield_23_AS$unmarketable_g)
+
+```
+2024 only: Original dataset isn't quite normally distributed (p = 0.04). Lambda is close to 0, indicating that log or inverse square root would be best. Because I don't think I'm going to actually analyze this dataset, I just did boxcox, which achieved a normal distribution
+
+```{r}
+# original dataset
+hist(yield_24_AS$unmarketable_g)
+skewness(yield_24_AS$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_24_AS$unmarketable_g, main='Normal')
+qqline(yield_24_AS$unmarketable_g)
+shapiro.test(yield_24_AS$unmarketable_g)
+
+# boxcox
+bc <- boxcox(lm(yield_24_AS$unmarketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_24_AS$bc_unmarket <- (yield_24_AS$unmarketable_g ^ lambda -1)/lambda
+
+hist(yield_24_AS$bc_unmarket)
+skewness(yield_24_AS$bc_unmarket, na.rm = TRUE)
+qqnorm(yield_24_AS$bc_unmarket, main='Normal')
+qqline(yield_24_AS$bc_unmarket)
+shapiro.test(yield_24_AS$bc_unmarket)
+```
+
+##### Total yield
+
+The original dataset is non-parametric. Boxcox function found that the lambda is close to 0, indicating that a log or boxcox transformation would be most appropriate. However, neither achieves a normal distribution (p = 0.01 for both)
+```{r}
+#original data set
+hist(yield_yr_AS$total_g)
+skewness(yield_yr_AS$total_g, na.rm = TRUE)
+qqnorm(yield_yr_AS$total_g, main='Normal')
+qqline(yield_yr_AS$total_g)
+shapiro.test(yield_yr_AS$total_g)
+
+# boxcox
+#bc <- boxcox(lm(yield_yr_AS$total_g ~ 1))
+#lambda <- bc$x[which.max(bc$y)]
+#yield_yr_AS$bc_total <- (yield_yr_AS$total_g ^ lambda -1)/lambda
+#shapiro.test(yield_yr_AS$bc_total)
+
+# log
+#yield_yr_AS$log_total <- log10(yield_yr_AS$total_g)
+#shapiro.test(yield_yr_AS$log_total)
+
+```
+2023 only: normal distribution
+
+```{r}
+# original dataset
+hist(yield_23_AS$total_g)
+skewness(yield_23_AS$total_g, na.rm = TRUE)
+qqnorm(yield_23_AS$total_g, main='Normal')
+qqline(yield_23_AS$total_g)
+shapiro.test(yield_23_AS$total_g)
+
+```
+2024 only: normal distribution
+
+```{r}
+# original dataset
+
+hist(yield_24_AS$total_g)
+skewness(yield_24_AS$total_g, na.rm = TRUE)
+qqnorm(yield_24_AS$total_g, main='Normal')
+qqline(yield_24_AS$total_g)
+shapiro.test(yield_24_AS$total_g)
+
+```
+
+#### Beans
+
+##### Marketable yield
+
+Original dataset is non-parametric. Lambda is close to 0, indicating log or boxcox, but neither achieves a normal distribution
+```{r}
+hist(yield_yr_DB$marketable_g)
+skewness(yield_yr_DB$marketable_g, na.rm = TRUE)
+qqnorm(yield_yr_DB$marketable_g, main='Normal')
+qqline(yield_yr_DB$marketable_g)
+shapiro.test(yield_yr_DB$marketable_g)
+
+#boxcox
+#bc <- boxcox(lm(yield_yr_DB$marketable_g ~ 1))
+#lambda <- bc$x[which.max(bc$y)]
+#yield_yr_DB$bc_marketable <- (yield_yr_DB$marketable_g ^ lambda -1)/lambda
+#shapiro.test(yield_yr_DB$bc_marketable)
+
+#log
+#yield_yr_DB$log_marketable <- log10(yield_yr_DB$marketable_g)
+#shapiro.test(yield_yr_DB$log_marketable)
+
+```
+
+2023 only: normal distribution
+
+```{r}
+# original dataset
+hist(yield_23_DB$marketable_g)
+skewness(yield_23_DB$marketable_g, na.rm = TRUE)
+qqnorm(yield_23_DB$marketable_g, main='Normal')
+qqline(yield_23_DB$marketable_g)
+shapiro.test(yield_23_DB$marketable_g)
+
+```
+
+2024 only: The dataset is non-parametric. Lambda indicates that either a boxcox, inverse, or inverse sqrt would be best. All work, but boxcox is best
+```{r}
+# original dataset
+hist(yield_24_DB$marketable_g)
+skewness(yield_24_DB$marketable_g, na.rm = TRUE)
+qqnorm(yield_24_DB$marketable_g, main='Normal')
+qqline(yield_24_DB$marketable_g)
+shapiro.test(yield_24_DB$marketable_g)
+
+#boxcox transformation
+bc <- boxcox(lm(yield_24_DB$marketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_24_DB$bc_marketable <- (yield_24_DB$marketable_g ^ lambda -1)/lambda
+
+hist(yield_24_DB$bc_marketable)
+skewness(yield_24_DB$bc_marketable, na.rm = TRUE)
+qqnorm(yield_24_DB$bc_marketable, main='Normal')
+qqline(yield_24_DB$bc_marketable)
+shapiro.test(yield_24_DB$bc_marketable)
+
+#inverse
+#yield_24_DB$inverse_marketable <- 1/yield_24_DB$marketable_g
+#shapiro.test(yield_24_DB$inverse_marketable)
+
+#inverse sqrt
+#yield_24_DB$sqrt_in_marketable <- 1/sqrt(yield_24_DB$marketable_g)
+#shapiro.test(yield_24_DB$sqrt_in_marketable)
+```
+
+##### Percent marketable
+Original dataset is non-parametric. Lambda is off the charts, and there is no transformation that is going to fix this lol
+```{r}
+hist(yield_yr_DB$per_market)
+skewness(yield_yr_DB$per_market, na.rm = TRUE)
+qqnorm(yield_yr_DB$per_market, main='Normal')
+qqline(yield_yr_DB$per_market)
+shapiro.test(yield_yr_DB$per_market)
+
+#boxcox
+#bc <- boxcox(lm(yield_yr_DB$per_market ~ 1))
+#lambda <- bc$x[which.max(bc$y)]
+#yield_yr_DB$bc_per <- (yield_yr_DB$per_market ^ lambda -1)/lambda
+#shapiro.test(yield_yr_DB$bc_per)
+
+```
+
+2023 only: everything is 100%, so there is no distribution.
+
+```{r}
+# original dataset
+hist(yield_23_DB$per_market)
+skewness(yield_23_DB$per_market, na.rm = TRUE)
+qqnorm(yield_23_DB$per_market, main='Normal')
+qqline(yield_23_DB$per_market)
+
+```
+2024 only: the lambda is off the charts, so this one will also stay non-parametric
+```{r}
+# original dataset
+hist(yield_24_DB$per_market)
+skewness(yield_24_DB$per_market, na.rm = TRUE)
+qqnorm(yield_24_DB$per_market, main='Normal')
+qqline(yield_24_DB$per_market)
+shapiro.test(yield_24_DB$per_market)
+bc <- boxcox(lm(yield_24_DB$per_market ~ 1))
+```
+
+##### Unmarketable yield
+There is no way to make this a normal distribution.
+```{r}
+hist(yield_yr_DB$unmarketable_g)
+skewness(yield_yr_DB$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_yr_DB$unmarketable_g, main='Normal')
+qqline(yield_yr_DB$unmarketable_g)
+shapiro.test(yield_yr_DB$unmarketable_g)
+bc <- boxcox(lm((yield_yr_DB$unmarketable_g + 1) ~ 1))
+```
+
+2023 only: non-parametric
+```{r}
+hist(yield_23_DB$unmarketable_g)
+skewness(yield_23_DB$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_23_DB$unmarketable_g, main='Normal')
+qqline(yield_23_DB$unmarketable_g)
+
+```
+
+2024 only: non-parametric
+```{r}
+
+hist(yield_24_DB$unmarketable_g)
+skewness(yield_24_DB$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_24_DB$unmarketable_g, main='Normal')
+qqline(yield_24_DB$unmarketable_g)
+shapiro.test(yield_24_DB$unmarketable_g)
+bc <- boxcox(lm((yield_24_DB$unmarketable_g + 1) ~ 1))
+
+```
+
+##### Total yield
+
+The original dataset is non-parametric. Lambda indicates that boxcox or log transformation are best suited. Neither, however, results in a normal distribution
+```{r}
+hist(yield_yr_DB$total_g)
+skewness(yield_yr_DB$total_g, na.rm = TRUE)
+qqnorm(yield_yr_DB$total_g, main='Normal')
+qqline(yield_yr_DB$total_g)
+shapiro.test(yield_yr_DB$total_g)
+
+#boxcox
+#bc <- boxcox(lm(yield_yr_DB$total_g ~ 1))
+#lambda <- bc$x[which.max(bc$y)]
+#yield_yr_DB$bc_total <- (yield_yr_DB$total_g ^ lambda -1)/lambda
+#shapiro.test(yield_yr_DB$bc_total)
+
+#log
+#yield_yr_DB$log_total <- log10(yield_yr_DB$total_g)
+#shapiro.test(yield_yr_DB$log_total)
+
+```
+
+2023 only: normal distribution
+
+```{r}
+hist(yield_23_DB$total_g)
+skewness(yield_23_DB$total_g, na.rm = TRUE)
+qqnorm(yield_23_DB$total_g, main='Normal')
+qqline(yield_23_DB$total_g)
+shapiro.test(yield_23_DB$total_g)
+
+```
+
+2024 only: The original dataset is non-parametric. The lambda indicates a boxcox, inverse, or inverse sqrt would be most appropriate. All are successful, but the boxcox is the best
+
+```{r}
+hist(yield_24_DB$total_g)
+skewness(yield_24_DB$total_g, na.rm = TRUE)
+qqnorm(yield_24_DB$total_g, main='Normal')
+qqline(yield_24_DB$total_g)
+shapiro.test(yield_24_DB$total_g)
+
+#boxcox
+bc <- boxcox(lm(yield_24_DB$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_24_DB$bc_total <- (yield_24_DB$total_g ^ lambda -1)/lambda
+
+hist(yield_24_DB$bc_total)
+skewness(yield_24_DB$bc_total, na.rm = TRUE)
+qqnorm(yield_24_DB$bc_total, main='Normal')
+qqline(yield_24_DB$bc_total)
+shapiro.test(yield_24_DB$bc_total)
+
+#inverse
+#yield_24_DB$inverse_total <- 1/yield_24_DB$total_g
+#shapiro.test(yield_24_DB$inverse_total)
+
+#inverse sqrt
+#yield_24_DB$inverse_sqrt_total <- 1/sqrt(yield_24_DB$total_g)
+#shapiro.test(yield_24_DB$inverse_sqrt_total)
+
+```
+
+#### Collards
+
+##### Marketable yield
+
+The original dataset is normally distributed
+```{r}
+# original dataset
+hist(yield_yr_FC$marketable_g)
+skewness(yield_yr_FC$marketable_g, na.rm = TRUE)
+qqnorm(yield_yr_FC$marketable_g, main='Normal')
+qqline(yield_yr_FC$marketable_g)
+shapiro.test(yield_yr_FC$marketable_g)
+
+```
+
+2023 only: The original dataset is non-parametric. The lambda is about 1.5, indicating that a boxcox, square, or cubic transformation would be best. Cubic offers the best distribution (p = 0.9)
+
+```{r}
+# original dataset
+hist(yield_23_FC$marketable_g)
+skewness(yield_23_FC$marketable_g, na.rm = TRUE)
+qqnorm(yield_23_FC$marketable_g, main='Normal')
+qqline(yield_23_FC$marketable_g)
+shapiro.test(yield_23_FC$marketable_g)
+
+#boxcox
+bc <- boxcox(lm(yield_23_FC$marketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_23_FC$bc_market <- (yield_23_FC$marketable_g ^ lambda -1)/lambda
+
+hist(yield_23_FC$bc_market)
+skewness(yield_23_FC$bc_market, na.rm = TRUE)
+qqnorm(yield_23_FC$bc_market, main='Normal')
+qqline(yield_23_FC$bc_market)
+shapiro.test(yield_23_FC$bc_market)
+
+#squared
+yield_23_FC$sq_market <- yield_23_FC$marketable_g^2
+
+hist(yield_23_FC$sq_market)
+skewness(yield_23_FC$sq_market, na.rm = TRUE)
+qqnorm(yield_23_FC$sq_market, main='Normal')
+qqline(yield_23_FC$sq_market)
+shapiro.test(yield_23_FC$sq_market)
+
+#cubic
+yield_23_FC$cubic_market <- yield_23_FC$marketable_g^3
+
+hist(yield_23_FC$cubic_market)
+skewness(yield_23_FC$cubic_market, na.rm = TRUE)
+qqnorm(yield_23_FC$cubic_market, main='Normal')
+qqline(yield_23_FC$cubic_market)
+shapiro.test(yield_23_FC$cubic_market)
+
+
+```
+2024 only: normal distribution
+
+```{r}
+# original dataset
+hist(yield_24_AS$marketable_g)
+skewness(yield_24_AS$marketable_g, na.rm = TRUE)
+qqnorm(yield_24_AS$marketable_g, main='Normal')
+qqline(yield_24_AS$marketable_g)
+shapiro.test(yield_24_AS$marketable_g)
+
+```
+
+##### Percent marketable
+
+The original dataset is normally distributed
+```{r}
+# original dataset
+hist(yield_yr_FC$per_market)
+skewness(yield_yr_FC$per_market, na.rm = TRUE)
+qqnorm(yield_yr_FC$per_market, main='Normal')
+qqline(yield_yr_FC$per_market)
+shapiro.test(yield_yr_FC$per_market)
+
+```
+2023 only: normal distribution
+
+```{r}
+# original dataset
+
+hist(yield_23_FC$per_market)
+skewness(yield_23_FC$per_market, na.rm = TRUE)
+qqnorm(yield_23_FC$per_market, main='Normal')
+qqline(yield_23_FC$per_market)
+shapiro.test(yield_23_FC$per_market)
+
+```
+2024 only: Normal distribution (p = 0.09), though a boxcox transformation improves it
+
+```{r}
+# original dataset
+hist(yield_24_FC$per_market)
+skewness(yield_24_FC$per_market, na.rm = TRUE)
+qqnorm(yield_24_FC$per_market, main='Normal')
+qqline(yield_24_FC$per_market)
+shapiro.test(yield_24_FC$per_market)
+
+#boxcox transformation
+bc <- boxcox(lm(yield_24_FC$per_market ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_24_FC$bc_per <- (yield_24_FC$per_market ^ lambda -1)/lambda
+
+hist(yield_24_FC$bc_per)
+skewness(yield_24_FC$bc_per, na.rm = TRUE)
+qqnorm(yield_24_FC$bc_per, main='Normal')
+qqline(yield_24_FC$bc_per)
+shapiro.test(yield_24_FC$bc_per)
+
+#log
+yield_24_FC$log_per <- log10(yield_24_FC$per_market)
+
+hist(yield_24_FC$log_per)
+skewness(yield_24_FC$log_per, na.rm = TRUE)
+qqnorm(yield_24_FC$log_per, main='Normal')
+qqline(yield_24_FC$log_per)
+shapiro.test(yield_24_FC$log_per)
+
+```
+
+##### Unmarketable yield
+
+The original dataset is non-parametric. A boxcox or log transformation achieves a normal distribution and have similar p-values.
+```{r}
+#original dataset
+hist(yield_yr_FC$unmarketable_g)
+skewness(yield_yr_FC$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_yr_FC$unmarketable_g, main='Normal')
+qqline(yield_yr_FC$unmarketable_g)
+shapiro.test(yield_yr_FC$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm(yield_yr_FC$unmarketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_yr_FC$bc_unmarketable <- (yield_yr_FC$unmarketable_g ^ lambda -1)/lambda
+
+hist(yield_yr_FC$bc_unmarketable)
+skewness(yield_yr_FC$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_yr_FC$bc_unmarketable, main='Normal')
+qqline(yield_yr_FC$bc_unmarketable)
+shapiro.test(yield_yr_FC$bc_unmarketable)
+
+#sqrt
+yield_yr_FC$log_market <- sqrt(yield_yr_FC$unmarketable_g)
+
+hist(yield_yr_FC$log_market)
+skewness(yield_yr_FC$log_market, na.rm = TRUE)
+qqnorm(yield_yr_FC$log_market, main='Normal')
+qqline(yield_yr_FC$log_market)
+shapiro.test(yield_yr_FC$log_market)
+
+```
+
+2023 only: The original dataset is non-parametric. Lambda indicates a boxcox or square transformation will be best, and I'll try a cubic -- which is the one that ultimately achieved the normal distribution.
+
+```{r}
+# original dataset
+hist(yield_23_FC$unmarketable_g)
+skewness(yield_23_FC$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_23_FC$unmarketable_g, main='Normal')
+qqline(yield_23_FC$unmarketable_g)
+shapiro.test(yield_23_FC$unmarketable_g)
+
+#boxcox
+bc <- boxcox(lm(yield_23_FC$unmarketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_23_FC$bc_unmarketable <- (yield_23_FC$unmarketable_g ^ lambda -1)/lambda
+
+hist(yield_23_FC$bc_unmarketable)
+skewness(yield_23_FC$bc_unmarketable, na.rm = TRUE)
+qqnorm(yield_23_FC$bc_unmarketable, main='Normal')
+qqline(yield_23_FC$bc_unmarketable)
+shapiro.test(yield_23_FC$bc_unmarketable)
+
+#squared 
+yield_23_FC$sq_unmarketable <- yield_23_FC$unmarketable_g^2
+
+hist(yield_23_FC$sq_unmarketable)
+skewness(yield_23_FC$sq_unmarketable, na.rm = TRUE)
+qqnorm(yield_23_FC$sq_unmarketable, main='Normal')
+qqline(yield_23_FC$sq_unmarketable)
+shapiro.test(yield_23_FC$sq_unmarketable)
+
+#cubic 
+yield_23_FC$cubic_unmarketable <- yield_23_FC$unmarketable_g^3
+
+hist(yield_23_FC$cubic_unmarketable)
+skewness(yield_23_FC$cubic_unmarketable, na.rm = TRUE)
+qqnorm(yield_23_FC$cubic_unmarketable, main='Normal')
+qqline(yield_23_FC$cubic_unmarketable)
+shapiro.test(yield_23_FC$cubic_unmarketable)
+
+```
+
+2024 only: normal distribution
+
+```{r}
+# original dataset
+hist(yield_24_FC$unmarketable_g)
+skewness(yield_24_FC$unmarketable_g, na.rm = TRUE)
+qqnorm(yield_24_FC$unmarketable_g, main='Normal')
+qqline(yield_24_FC$unmarketable_g)
+shapiro.test(yield_24_FC$unmarketable_g)
+
+```
+
+##### Total yield
+
+The original dataset is normally distributed
+```{r}
+#original data set
+hist(yield_yr_FC$total_g)
+skewness(yield_yr_FC$total_g, na.rm = TRUE)
+qqnorm(yield_yr_FC$total_g, main='Normal')
+qqline(yield_yr_FC$total_g)
+shapiro.test(yield_yr_FC$total_g)
+
+```
+2023 only: The original dataset is non-parametric. Lambda indicates that squared or cubic transformation will be best. Cubic is the only one that results in a normal distribution
+
+```{r}
+# original dataset
+hist(yield_23_FC$total_g)
+skewness(yield_23_FC$total_g, na.rm = TRUE)
+qqnorm(yield_23_FC$total_g, main='Normal')
+qqline(yield_23_FC$total_g)
+shapiro.test(yield_23_FC$total_g)
+
+#boxcox
+bc <- boxcox(lm(yield_23_FC$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_23_FC$bc_total <- (yield_23_FC$total_g ^ lambda -1)/lambda
+
+hist(yield_23_FC$bc_total)
+skewness(yield_23_FC$bc_total, na.rm = TRUE)
+qqnorm(yield_23_FC$bc_total, main='Normal')
+qqline(yield_23_FC$bc_total)
+shapiro.test(yield_23_FC$bc_total)
+
+#squared 
+yield_23_FC$sq_total <- yield_23_FC$total_g^2
+
+hist(yield_23_FC$sq_total)
+skewness(yield_23_FC$sq_total, na.rm = TRUE)
+qqnorm(yield_23_FC$sq_total, main='Normal')
+qqline(yield_23_FC$sq_total)
+shapiro.test(yield_23_FC$sq_total)
+
+#cubic 
+yield_23_FC$cubic_total <- yield_23_FC$total_g^3
+
+hist(yield_23_FC$cubic_total)
+skewness(yield_23_FC$cubic_total, na.rm = TRUE)
+qqnorm(yield_23_FC$cubic_total, main='Normal')
+qqline(yield_23_FC$cubic_total)
+shapiro.test(yield_23_FC$cubic_total)
+
+```
+2024 only: normal distribution
+
+```{r}
+# original dataset
+
+hist(yield_24_AS$total_g)
+skewness(yield_24_AS$total_g, na.rm = TRUE)
+qqnorm(yield_24_AS$total_g, main='Normal')
+qqline(yield_24_AS$total_g)
+shapiro.test(yield_24_AS$total_g)
+
+```
+
+### SPAD
+
+#### Strawberries
+
+##### outliers removed
+
+The original dataset is non-parametric. Lambda is between 0.5 and 1, indicating that a sqrt or boxcox transformation would be best suited, but neither results in a normal distribution
+```{r}
+#original dataset
+hist(spad_AS$value)
+skewness(spad_AS$value, na.rm = TRUE)
+qqnorm(spad_AS$value, main='Normal')
+qqline(spad_AS$value)
+shapiro.test(spad_AS$value)
+
+#boxcox
+bc <- boxcox(lm(spad_AS$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_AS$bc_value <- (spad_AS$value ^ lambda -1)/lambda
+
+hist(spad_AS$bc_value)
+skewness(spad_AS$bc_value, na.rm = TRUE)
+qqnorm(spad_AS$bc_value, main='Normal')
+qqline(spad_AS$bc_value)
+shapiro.test(spad_AS$bc_value)
+
+# sqrt
+spad_AS$sqrt_value <- sqrt(spad_AS$value)
+
+hist(spad_AS$sqrt_value)
+skewness(spad_AS$sqrt_value, na.rm = TRUE)
+qqnorm(spad_AS$sqrt_value, main='Normal')
+qqline(spad_AS$sqrt_value)
+shapiro.test(spad_AS$sqrt_value)
+```
+
+2023 only: The dataset is non-parametric. Lambda is between 0 and 0.5, indicating a log, sqrt, or boxcox transformation would be most appropriate. All are successful, but boxcox is the most normal distribution
+```{r}
+spad_23_AS <- subset(spad_AS, year == "2023")
+
+#original dataset
+hist(spad_23_AS$value)
+skewness(spad_23_AS$value, na.rm = TRUE)
+qqnorm(spad_23_AS$value, main='Normal')
+qqline(spad_23_AS$value)
+shapiro.test(spad_23_AS$value)
+
+#boxcox
+bc <- boxcox(lm(spad_23_AS$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_AS$bc_value <- (spad_23_AS$value ^ lambda -1)/lambda
+
+hist(spad_23_AS$bc_value)
+skewness(spad_23_AS$bc_value, na.rm = TRUE)
+qqnorm(spad_23_AS$bc_value, main='Normal')
+qqline(spad_23_AS$bc_value)
+shapiro.test(spad_23_AS$bc_value)
+
+# log
+spad_23_AS$log_value <- log10(spad_23_AS$value)
+
+hist(spad_23_AS$log_value)
+skewness(spad_23_AS$log_value, na.rm = TRUE)
+qqnorm(spad_23_AS$log_value, main='Normal')
+qqline(spad_23_AS$log_value)
+shapiro.test(spad_23_AS$log_value)
+
+
+# sqrt
+spad_23_AS$sqrt_value <- sqrt(spad_23_AS$value)
+
+hist(spad_23_AS$sqrt_value)
+skewness(spad_23_AS$sqrt_value, na.rm = TRUE)
+qqnorm(spad_23_AS$sqrt_value, main='Normal')
+qqline(spad_23_AS$sqrt_value)
+shapiro.test(spad_23_AS$sqrt_value)
+```
+
+2024 only: The dataset is non-parametric with a lambda between 1 and 2, indicating a boxcox or square transformation would be most appropriate. Neither are successful, though
+```{r}
+spad_24_AS <- subset(spad_AS, year == "2024")
+
+#original dataset
+hist(spad_24_AS$value)
+skewness(spad_24_AS$value, na.rm = TRUE)
+qqnorm(spad_24_AS$value, main='Normal')
+qqline(spad_24_AS$value)
+shapiro.test(spad_24_AS$value)
+
+#boxcox
+bc <- boxcox(lm(spad_24_AS$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_24_AS$bc_value <- (spad_24_AS$value ^ lambda -1)/lambda
+
+hist(spad_24_AS$bc_value)
+skewness(spad_24_AS$bc_value, na.rm = TRUE)
+qqnorm(spad_24_AS$bc_value, main='Normal')
+qqline(spad_24_AS$bc_value)
+shapiro.test(spad_24_AS$bc_value)
+
+# squared
+spad_24_AS$sq_value <- spad_24_AS$value^2
+
+hist(spad_24_AS$sq_value)
+skewness(spad_24_AS$sq_value, na.rm = TRUE)
+qqnorm(spad_24_AS$sq_value, main='Normal')
+qqline(spad_24_AS$sq_value)
+shapiro.test(spad_24_AS$sq_value)
+
+```
+
+
+##### including outliers
+
+The dataset is non-parametric, with a lambda close to -0.5, indicating an inverse square root, log, or boxcox will be most appropriate. None achieve a normal distribution
+```{r}
+#original dataset
+hist(spad_AS_out$value)
+skewness(spad_AS_out$value, na.rm = TRUE)
+qqnorm(spad_AS_out$value, main='Normal')
+qqline(spad_AS_out$value)
+shapiro.test(spad_AS_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_AS_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_AS_out$bc_value <- (spad_AS_out$value ^ lambda -1)/lambda
+
+hist(spad_AS_out$bc_value)
+skewness(spad_AS_out$bc_value, na.rm = TRUE)
+qqnorm(spad_AS_out$bc_value, main='Normal')
+qqline(spad_AS_out$bc_value)
+shapiro.test(spad_AS_out$bc_value)
+
+# log
+spad_AS_out$log_value <- log10(spad_AS_out$value)
+
+hist(spad_AS_out$log_value)
+skewness(spad_AS_out$log_value, na.rm = TRUE)
+qqnorm(spad_AS_out$log_value, main='Normal')
+qqline(spad_AS_out$log_value)
+shapiro.test(spad_AS_out$log_value) 
+
+# inverse sqrt
+spad_AS_out$in_sqrt_value <- 1/sqrt(spad_AS_out$value)
+
+hist(spad_AS_out$in_sqrt_value)
+skewness(spad_AS_out$in_sqrt_value, na.rm = TRUE)
+qqnorm(spad_AS_out$in_sqrt_value, main='Normal')
+qqline(spad_AS_out$in_sqrt_value)
+shapiro.test(spad_AS_out$in_sqrt_value)
+```
+
+2023 only: The dataset is non-parametric. Lambda is between 0 and 0.5, indicating a log, sqrt, or boxcox transformation would be most appropriate. All are successful, but boxcox is the most normal distribution
+```{r}
+spad_23_AS_out <- subset(spad_AS_out, year == "2023")
+
+#original dataset
+hist(spad_23_AS_out$value)
+skewness(spad_23_AS_out$value, na.rm = TRUE)
+qqnorm(spad_23_AS_out$value, main='Normal')
+qqline(spad_23_AS_out$value)
+shapiro.test(spad_23_AS_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_23_AS_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_AS_out$bc_value <- (spad_23_AS_out$value ^ lambda -1)/lambda
+
+hist(spad_23_AS_out$bc_value)
+skewness(spad_23_AS_out$bc_value, na.rm = TRUE)
+qqnorm(spad_23_AS_out$bc_value, main='Normal')
+qqline(spad_23_AS_out$bc_value)
+shapiro.test(spad_23_AS_out$bc_value)
+
+# log
+spad_23_AS_out$log_value <- log10(spad_23_AS_out$value)
+
+hist(spad_23_AS_out$log_value)
+skewness(spad_23_AS_out$log_value, na.rm = TRUE)
+qqnorm(spad_23_AS_out$log_value, main='Normal')
+qqline(spad_23_AS_out$log_value)
+shapiro.test(spad_23_AS_out$log_value)
+
+# sqrt
+spad_23_AS_out$sqrt_value <- sqrt(spad_23_AS_out$value)
+
+hist(spad_23_AS_out$sqrt_value)
+skewness(spad_23_AS_out$sqrt_value, na.rm = TRUE)
+qqnorm(spad_23_AS_out$sqrt_value, main='Normal')
+qqline(spad_23_AS_out$sqrt_value)
+shapiro.test(spad_23_AS_out$sqrt_value)
+```
+
+2024 only: The dataset is non-parametric with a lambda between 0 and -0.5, indicating a boxcox, log, or inverse sqrt transformation would be most appropriate. None are successful, though
+```{r}
+spad_24_AS_out <- subset(spad_AS_out, year == "2024")
+
+#original dataset
+hist(spad_24_AS_out$value)
+skewness(spad_24_AS_out$value, na.rm = TRUE)
+qqnorm(spad_24_AS_out$value, main='Normal')
+qqline(spad_24_AS_out$value)
+shapiro.test(spad_24_AS_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_24_AS_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_24_AS_out$bc_value <- (spad_24_AS_out$value ^ lambda -1)/lambda
+
+hist(spad_24_AS_out$bc_value)
+skewness(spad_24_AS_out$bc_value, na.rm = TRUE)
+qqnorm(spad_24_AS_out$bc_value, main='Normal')
+qqline(spad_24_AS_out$bc_value)
+shapiro.test(spad_24_AS_out$bc_value)
+
+# log
+spad_24_AS_out$log_value <- log10(spad_24_AS_out$value)
+
+hist(spad_24_AS_out$log_value)
+skewness(spad_24_AS_out$log_value, na.rm = TRUE)
+qqnorm(spad_24_AS_out$log_value, main='Normal')
+qqline(spad_24_AS_out$log_value)
+shapiro.test(spad_24_AS_out$log_value)
+
+# inverse square root
+spad_24_AS_out$in_sqrt_value <- 1/sqrt(spad_24_AS_out$value)
+
+hist(spad_24_AS_out$in_sqrt_value)
+skewness(spad_24_AS_out$in_sqrt_value, na.rm = TRUE)
+qqnorm(spad_24_AS_out$in_sqrt_value, main='Normal')
+qqline(spad_24_AS_out$in_sqrt_value)
+shapiro.test(spad_24_AS_out$in_sqrt_value)
+
+```
+
+#### Beans
+
+##### outliers removed
+
+The original dataset is non-parametric. Lambda is close to 1, indicating that a square root or boxcox transformation might work, but neither results in a normal distribution
+```{r}
+#original dataset
+hist(spad_DB$value)
+skewness(spad_DB$value, na.rm = TRUE)
+qqnorm(spad_DB$value, main='Normal')
+qqline(spad_DB$value)
+shapiro.test(spad_DB$value)
+
+#boxcox
+bc <- boxcox(lm(spad_DB$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_DB$bc_value <- (spad_DB$value ^ lambda -1)/lambda
+
+hist(spad_DB$bc_value)
+skewness(spad_DB$bc_value, na.rm = TRUE)
+qqnorm(spad_DB$bc_value, main='Normal')
+qqline(spad_DB$bc_value)
+shapiro.test(spad_DB$bc_value)
+
+# sqrt
+spad_DB$sqrt_value <- sqrt(spad_DB$value)
+
+hist(spad_DB$sqrt_value)
+skewness(spad_DB$sqrt_value, na.rm = TRUE)
+qqnorm(spad_DB$sqrt_value, main='Normal')
+qqline(spad_DB$sqrt_value)
+shapiro.test(spad_DB$sqrt_value)
+
+```
+
+2023 only: The dataset is non-parametric. Lambda is between 0 and -0.5, indicating a log, sqrt, or boxcox transformation would be most appropriate. None result in a normal distribution, though
+```{r}
+spad_23_DB <- subset(spad_DB, year == "2023")
+
+#original dataset
+hist(spad_23_DB$value)
+skewness(spad_23_DB$value, na.rm = TRUE)
+qqnorm(spad_23_DB$value, main='Normal')
+qqline(spad_23_DB$value)
+shapiro.test(spad_23_DB$value)
+
+#boxcox
+bc <- boxcox(lm(spad_23_DB$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_DB$bc_value <- (spad_23_DB$value ^ lambda -1)/lambda
+
+hist(spad_23_DB$bc_value)
+skewness(spad_23_DB$bc_value, na.rm = TRUE)
+qqnorm(spad_23_DB$bc_value, main='Normal')
+qqline(spad_23_DB$bc_value)
+shapiro.test(spad_23_DB$bc_value)
+
+# log
+spad_23_DB$log_value <- log10(spad_23_DB$value)
+
+hist(spad_23_DB$log_value)
+skewness(spad_23_DB$log_value, na.rm = TRUE)
+qqnorm(spad_23_DB$log_value, main='Normal')
+qqline(spad_23_DB$log_value)
+shapiro.test(spad_23_DB$log_value)
+
+
+# inverse sqrt
+spad_23_DB$sqrt_value <- 1/sqrt(spad_23_DB$value)
+
+hist(spad_23_DB$sqrt_value)
+skewness(spad_23_DB$sqrt_value, na.rm = TRUE)
+qqnorm(spad_23_DB$sqrt_value, main='Normal')
+qqline(spad_23_DB$sqrt_value)
+shapiro.test(spad_23_DB$sqrt_value)
+```
+
+2024 only: The dataset is non-parametric with a lambda between 1 and 2, indicating a boxcox or square transformation would be most appropriate. Neither are successful, though
+```{r}
+spad_24_DB <- subset(spad_DB, year == "2024")
+
+#original dataset
+hist(spad_24_DB$value)
+skewness(spad_24_DB$value, na.rm = TRUE)
+qqnorm(spad_24_DB$value, main='Normal')
+qqline(spad_24_DB$value)
+shapiro.test(spad_24_DB$value)
+
+#boxcox
+bc <- boxcox(lm(spad_24_DB$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_24_DB$bc_value <- (spad_24_DB$value ^ lambda -1)/lambda
+
+hist(spad_24_DB$bc_value)
+skewness(spad_24_DB$bc_value, na.rm = TRUE)
+qqnorm(spad_24_DB$bc_value, main='Normal')
+qqline(spad_24_DB$bc_value)
+shapiro.test(spad_24_DB$bc_value)
+
+# squared
+spad_24_DB$sq_value <- spad_24_DB$value^2
+
+hist(spad_24_DB$sq_value)
+skewness(spad_24_DB$sq_value, na.rm = TRUE)
+qqnorm(spad_24_DB$sq_value, main='Normal')
+qqline(spad_24_DB$sq_value)
+shapiro.test(spad_24_DB$sq_value)
+
+```
+
+
+##### including outliers
+
+The dataset is non-parametric, with a lambda close between 1 and 2, indicating an squared or boxcox will be most appropriate. Neither achieve a normal distribution
+```{r}
+#original dataset
+hist(spad_DB_out$value)
+skewness(spad_DB_out$value, na.rm = TRUE)
+qqnorm(spad_DB_out$value, main='Normal')
+qqline(spad_DB_out$value)
+shapiro.test(spad_DB_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_DB_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_DB_out$bc_value <- (spad_DB_out$value ^ lambda -1)/lambda
+
+hist(spad_DB_out$bc_value)
+skewness(spad_DB_out$bc_value, na.rm = TRUE)
+qqnorm(spad_DB_out$bc_value, main='Normal')
+qqline(spad_DB_out$bc_value)
+shapiro.test(spad_DB_out$bc_value)
+
+# squared
+spad_DB_out$sq_value <- spad_DB_out$value^2
+
+hist(spad_DB_out$sq_value)
+skewness(spad_DB_out$sq_value, na.rm = TRUE)
+qqnorm(spad_DB_out$sq_value, main='Normal')
+qqline(spad_DB_out$sq_value)
+shapiro.test(spad_DB_out$sq_value) 
+
+```
+
+2023 only: The dataset is non-parametric. Lambda is between 0.5 and 1, indicating a sqrt or boxcox transformation would be most appropriate. Neither results in a normal distribution though
+```{r}
+spad_23_DB_out <- subset(spad_DB_out, year == "2023")
+
+#original dataset
+hist(spad_23_DB_out$value)
+skewness(spad_23_DB_out$value, na.rm = TRUE)
+qqnorm(spad_23_DB_out$value, main='Normal')
+qqline(spad_23_DB_out$value)
+shapiro.test(spad_23_DB_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_23_DB_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_DB_out$bc_value <- (spad_23_DB_out$value ^ lambda -1)/lambda
+
+hist(spad_23_DB_out$bc_value)
+skewness(spad_23_DB_out$bc_value, na.rm = TRUE)
+qqnorm(spad_23_DB_out$bc_value, main='Normal')
+qqline(spad_23_DB_out$bc_value)
+shapiro.test(spad_23_DB_out$bc_value)
+
+# sqrt
+spad_23_DB_out$sqrt_value <- sqrt(spad_23_DB_out$value)
+
+hist(spad_23_DB_out$sqrt_value)
+skewness(spad_23_DB_out$sqrt_value, na.rm = TRUE)
+qqnorm(spad_23_DB_out$sqrt_value, main='Normal')
+qqline(spad_23_DB_out$sqrt_value)
+shapiro.test(spad_23_DB_out$sqrt_value)
+```
+
+2024 only: The dataset is non-parametric with a lambda between 1 and 2, indicating a boxcox or squared. Neither are successful, though
+```{r}
+spad_24_DB_out <- subset(spad_DB_out, year == "2024")
+
+#original dataset
+hist(spad_24_DB_out$value)
+skewness(spad_24_DB_out$value, na.rm = TRUE)
+qqnorm(spad_24_DB_out$value, main='Normal')
+qqline(spad_24_DB_out$value)
+shapiro.test(spad_24_DB_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_24_DB_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_24_DB_out$bc_value <- (spad_24_DB_out$value ^ lambda -1)/lambda
+
+hist(spad_24_DB_out$bc_value)
+skewness(spad_24_DB_out$bc_value, na.rm = TRUE)
+qqnorm(spad_24_DB_out$bc_value, main='Normal')
+qqline(spad_24_DB_out$bc_value)
+shapiro.test(spad_24_DB_out$bc_value)
+
+# log
+spad_24_DB_out$sq_value <- spad_24_DB_out$value^2
+
+hist(spad_24_DB_out$sq_value)
+skewness(spad_24_DB_out$sq_value, na.rm = TRUE)
+qqnorm(spad_24_DB_out$sq_value, main='Normal')
+qqline(spad_24_DB_out$sq_value)
+shapiro.test(spad_24_DB_out$sq_value)
+
+
+```
+
+#### collards
+
+##### outliers removed
+
+The original dataset is non-parametric. Lambda is between 0 and 0.5, indicating that a square root or boxcox transformation would be best suited, but neither results in a normal distribution
+```{r}
+#original dataset
+hist(spad_FC$value)
+skewness(spad_FC$value, na.rm = TRUE)
+qqnorm(spad_FC$value, main='Normal')
+qqline(spad_FC$value)
+shapiro.test(spad_FC$value)
+
+#boxcox
+bc <- boxcox(lm(spad_FC$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_FC$bc_value <- (spad_FC$value ^ lambda -1)/lambda
+
+hist(spad_FC$bc_value)
+skewness(spad_FC$bc_value, na.rm = TRUE)
+qqnorm(spad_FC$bc_value, main='Normal')
+qqline(spad_FC$bc_value)
+shapiro.test(spad_FC$bc_value)
+
+# sqrt
+spad_FC$sqrt_value <- sqrt(spad_FC$value)
+
+hist(spad_FC$sqrt_value)
+skewness(spad_FC$sqrt_value, na.rm = TRUE)
+qqnorm(spad_FC$sqrt_value, main='Normal')
+qqline(spad_FC$sqrt_value)
+shapiro.test(spad_FC$sqrt_value)
+
+
+```
+
+2023 only: The dataset is non-parametric. Lambda is between 0.5 and 1, indicating a sqrt or boxcox transformation would be most appropriate. Neither achieves a normal distribution though
+```{r}
+spad_23_FC <- subset(spad_FC, year == "2023")
+
+#original dataset
+hist(spad_23_FC$value)
+skewness(spad_23_FC$value, na.rm = TRUE)
+qqnorm(spad_23_FC$value, main='Normal')
+qqline(spad_23_FC$value)
+shapiro.test(spad_23_FC$value)
+
+#boxcox
+bc <- boxcox(lm(spad_23_FC$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_FC$bc_value <- (spad_23_FC$value ^ lambda -1)/lambda
+
+hist(spad_23_FC$bc_value)
+skewness(spad_23_FC$bc_value, na.rm = TRUE)
+qqnorm(spad_23_FC$bc_value, main='Normal')
+qqline(spad_23_FC$bc_value)
+shapiro.test(spad_23_FC$bc_value)
+
+# sqrt
+spad_23_FC$sqrt_value <- sqrt(spad_23_FC$value)
+
+hist(spad_23_FC$sqrt_value)
+skewness(spad_23_FC$sqrt_value, na.rm = TRUE)
+qqnorm(spad_23_FC$sqrt_value, main='Normal')
+qqline(spad_23_FC$sqrt_value)
+shapiro.test(spad_23_FC$sqrt_value)
+```
+
+2024 only: normal distribution!
+```{r}
+spad_24_FC <- subset(spad_FC, year == "2024")
+
+#original dataset
+hist(spad_24_FC$value)
+skewness(spad_24_FC$value, na.rm = TRUE)
+qqnorm(spad_24_FC$value, main='Normal')
+qqline(spad_24_FC$value)
+shapiro.test(spad_24_FC$value)
+
+```
+
+
+##### including outliers
+
+The dataset is non-parametric, with a lambda close to -1, indicating an inverse square root, inverse, or boxcox will be most appropriate. None achieve a normal distribution
+```{r}
+#original dataset
+hist(spad_FC_out$value)
+skewness(spad_FC_out$value, na.rm = TRUE)
+qqnorm(spad_FC_out$value, main='Normal')
+qqline(spad_FC_out$value)
+shapiro.test(spad_FC_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_FC_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_FC_out$bc_value <- (spad_FC_out$value ^ lambda -1)/lambda
+
+hist(spad_FC_out$bc_value)
+skewness(spad_FC_out$bc_value, na.rm = TRUE)
+qqnorm(spad_FC_out$bc_value, main='Normal')
+qqline(spad_FC_out$bc_value)
+shapiro.test(spad_FC_out$bc_value)
+
+# inverse sqrt
+spad_FC_out$in_sqrt_value <- 1/sqrt(spad_FC_out$value)
+
+hist(spad_FC_out$in_sqrt_value)
+skewness(spad_FC_out$in_sqrt_value, na.rm = TRUE)
+qqnorm(spad_FC_out$in_sqrt_value, main='Normal')
+qqline(spad_FC_out$in_sqrt_value)
+shapiro.test(spad_FC_out$in_sqrt_value)
+
+# inverse 
+spad_FC_out$inverse_value <- 1/(spad_FC_out$value)
+
+hist(spad_FC_out$inverse_value)
+skewness(spad_FC_out$inverse_value, na.rm = TRUE)
+qqnorm(spad_FC_out$inverse_value, main='Normal')
+qqline(spad_FC_out$inverse_value)
+shapiro.test(spad_FC_out$inverse_value)
+```
+
+2023 only: The dataset is non-parametric. Lambda is between 0.5 and 1, indicating a sqrt or boxcox transformation would be most appropriate. Neither achieve a normal distribution though
+```{r}
+spad_23_FC_out <- subset(spad_FC_out, year == "2023")
+
+#original dataset
+hist(spad_23_FC_out$value)
+skewness(spad_23_FC_out$value, na.rm = TRUE)
+qqnorm(spad_23_FC_out$value, main='Normal')
+qqline(spad_23_FC_out$value)
+shapiro.test(spad_23_FC_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_23_FC_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_FC_out$bc_value <- (spad_23_FC_out$value ^ lambda -1)/lambda
+
+hist(spad_23_FC_out$bc_value)
+skewness(spad_23_FC_out$bc_value, na.rm = TRUE)
+qqnorm(spad_23_FC_out$bc_value, main='Normal')
+qqline(spad_23_FC_out$bc_value)
+shapiro.test(spad_23_FC_out$bc_value)
+
+# sqrt
+spad_23_FC_out$sqrt_value <- sqrt(spad_23_FC_out$value)
+
+hist(spad_23_FC_out$sqrt_value)
+skewness(spad_23_FC_out$sqrt_value, na.rm = TRUE)
+qqnorm(spad_23_FC_out$sqrt_value, main='Normal')
+qqline(spad_23_FC_out$sqrt_value)
+shapiro.test(spad_23_FC_out$sqrt_value)
+```
+
+2024 only: The dataset is non-parametric with a lambda between 0 and -0.5, indicating a boxcox, log, or inverse sqrt transformation would be most appropriate. None are successful, though
+```{r}
+spad_24_FC_out <- subset(spad_FC_out, year == "2024")
+
+#original dataset
+hist(spad_24_FC_out$value)
+skewness(spad_24_FC_out$value, na.rm = TRUE)
+qqnorm(spad_24_FC_out$value, main='Normal')
+qqline(spad_24_FC_out$value)
+shapiro.test(spad_24_FC_out$value)
+
+#boxcox
+bc <- boxcox(lm(spad_24_FC_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_24_FC_out$bc_value <- (spad_24_FC_out$value ^ lambda -1)/lambda
+
+hist(spad_24_FC_out$bc_value)
+skewness(spad_24_FC_out$bc_value, na.rm = TRUE)
+qqnorm(spad_24_FC_out$bc_value, main='Normal')
+qqline(spad_24_FC_out$bc_value)
+shapiro.test(spad_24_FC_out$bc_value)
+
+# log
+spad_24_FC_out$log_value <- log10(spad_24_FC_out$value)
+
+hist(spad_24_FC_out$log_value)
+skewness(spad_24_FC_out$log_value, na.rm = TRUE)
+qqnorm(spad_24_FC_out$log_value, main='Normal')
+qqline(spad_24_FC_out$log_value)
+shapiro.test(spad_24_FC_out$log_value)
+
+# inverse square root
+spad_24_FC_out$in_sqrt_value <- 1/sqrt(spad_24_FC_out$value)
+
+hist(spad_24_FC_out$in_sqrt_value)
+skewness(spad_24_FC_out$in_sqrt_value, na.rm = TRUE)
+qqnorm(spad_24_FC_out$in_sqrt_value, main='Normal')
+qqline(spad_24_FC_out$in_sqrt_value)
+shapiro.test(spad_24_FC_out$in_sqrt_value)
+
+```

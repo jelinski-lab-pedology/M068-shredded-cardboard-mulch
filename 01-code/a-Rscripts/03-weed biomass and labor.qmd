@@ -15,6 +15,8 @@ library(lme4)         #mixed models
 library(lmerTest)     #mixed models
 library(broom.mixed)  #mixed models
 library(emmeans)
+library(moments) #skewness function
+library(FSA)          # dunnTest function
 
 ```
 
@@ -57,7 +59,12 @@ Most representative of statistical analysis
 
 ```{r}
 #crops combined, year visualized by weed collection/treatment
-ggplot(weed_biomass, aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+ggplot(subset(weed_biomass, year == "2023"), aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() 
+
+ggplot(subset(weed_biomass, year == "2024"), aes(x = weeding_point, y = od_g, fill = treatment)) + geom_boxplot() 
+
+#crops and weeding point combined, visualized by treatment for each year
+ggplot(weed_biomass, aes(x = as.factor(year), y = od_g, fill = treatment)) + geom_boxplot()
 
 ```
 
@@ -77,9 +84,6 @@ ggplot(weed_biomass, aes(x = crop, y = od_g, fill = treatment)) + geom_boxplot()
 #weeding point and year combined, visualized by crop/treatment
 ggplot(weed_biomass, aes(x = crop, y = od_g, fill = treatment)) + geom_boxplot()
 
-#crops and weeding point combined, visualized by treatment for each year
-ggplot(weed_biomass, aes(x = as.factor(year), y = od_g, fill = treatment)) + geom_boxplot()
-
 # just treatments
 ggplot(weed_biomass, aes(x = treatment, y = od_g)) + geom_boxplot()
 
@@ -89,32 +93,204 @@ ggplot(weed_biomass, aes(x = treatment, y = od_g)) + geom_boxplot()
 
 Is it possible to transform this to a normal distribution, and if not, how do I analyze it?
 
-```{r}
-library(moments) #skewness function
+#### Overall
 
+Over half of the outliers are bare soil. Furthermore, none of them feel outside the realm of what we observed re: weed growth
+```{r}
+Q1 <- quantile(weed_biomass$od_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(weed_biomass$od_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(weed_biomass$od_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(weed_biomass, weed_biomass$od_g > upper_bound | 
+                    weed_biomass$od_g < lower_bound)
+```
+
+
+```{r}
 hist(weed_biomass$od_g)
 skewness(weed_biomass$od_g, na.rm = TRUE)
 qqnorm(weed_biomass$od_g, main='Normal')
 qqline(weed_biomass$od_g)
 shapiro.test(weed_biomass$od_g)
 
+#lambda is close to -1, indicating that a boxcox or inverse transformation would be best. neither is successful
+
+#boxcox
 bc <- boxcox(lm((weed_biomass$od_g + 1) ~ 1))
 lambda <- bc$x[which.max(bc$y)]
 weed_biomass$bc_od <- ((weed_biomass$od_g + 1) ^ lambda -1)/lambda
 
-```
+hist(weed_biomass$bc_od)
+skewness(weed_biomass$bc_od, na.rm = TRUE)
+qqnorm(weed_biomass$bc_od, main='Normal')
+qqline(weed_biomass$bc_od)
+shapiro.test(weed_biomass$bc_od)
 
-### One way tests
+#inverse
+weed_biomass$inverse_od <- 1/(weed_biomass$od_g+1)
 
-```{r}
-library(FSA)          # <3>
-kruskal.test(od_g ~ year, weed_biomass) # p < 0.001, so analyzing years separately
+hist(weed_biomass$inverse_od)
+skewness(weed_biomass$inverse_od, na.rm = TRUE)
+qqnorm(weed_biomass$inverse_od, main='Normal')
+qqline(weed_biomass$inverse_od)
+shapiro.test(weed_biomass$inverse_od)
 
-kruskal.test(od_g ~ weeding_point, subset(weed_biomass, year == "2023")) # p < 0.001, so analyzing each weeding point separately
-kruskal.test(od_g ~ weeding_point, subset(weed_biomass, year == "2024")) # p < 0.001, so analyzing each weeding point separately
 ```
 
 #### 2023
+
+The original data is non-parametric. lambda is close to -2, indicating that a boxcox or inverse squared transformation would be best. neither is successful.
+```{r}
+weed_biomass_23 <- subset(weed_biomass, year == "2023")
+
+#outlier check - same conclusions as overall
+Q1 <- quantile(weed_biomass_23$od_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(weed_biomass_23$od_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(weed_biomass_23$od_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(weed_biomass_23, weed_biomass_23$od_g > upper_bound | 
+                    weed_biomass_23$od_g < lower_bound)
+
+#original dataset
+hist(weed_biomass_23$od_g)
+skewness(weed_biomass_23$od_g, na.rm = TRUE)
+qqnorm(weed_biomass_23$od_g, main='Normal')
+qqline(weed_biomass_23$od_g)
+shapiro.test(weed_biomass_23$od_g)
+
+#boxcox
+bc <- boxcox(lm((weed_biomass_23$od_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+weed_biomass_23$bc_od <- ((weed_biomass_23$od_g + 1) ^ lambda -1)/lambda
+
+hist(weed_biomass_23$bc_od)
+skewness(weed_biomass_23$bc_od, na.rm = TRUE)
+qqnorm(weed_biomass_23$bc_od, main='Normal')
+qqline(weed_biomass_23$bc_od)
+shapiro.test(weed_biomass_23$bc_od)
+
+#inverse sq
+weed_biomass_23$inverse_sq_od <- 1/(weed_biomass_23$od_g+1)^2
+
+hist(weed_biomass_23$inverse_sq_od)
+skewness(weed_biomass_23$inverse_sq_od, na.rm = TRUE)
+qqnorm(weed_biomass_23$inverse_sq_od, main='Normal')
+qqline(weed_biomass_23$inverse_sq_od)
+shapiro.test(weed_biomass_23$inverse_sq_od)
+
+```
+
+#### 2024
+The original dataset is non-parametric. Lambda is between -0.5 and -1, indicating that a boxcox, inverse, or inverse sqrt would be most appropriate. none are successful.
+```{r}
+weed_biomass_24 <- subset(weed_biomass, year == "2024")
+
+#outlier check - same conclusions as overall
+Q1 <- quantile(weed_biomass_24$od_g, 0.25, na.rm = TRUE) 
+Q3 <- quantile(weed_biomass_24$od_g, 0.75, na.rm = TRUE) 
+IQR <- IQR(weed_biomass_24$od_g,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+subset(weed_biomass_24, weed_biomass_24$od_g > upper_bound | 
+                    weed_biomass_24$od_g < lower_bound)
+
+#original dataset
+hist(weed_biomass_24$od_g)
+skewness(weed_biomass_24$od_g, na.rm = TRUE)
+qqnorm(weed_biomass_24$od_g, main='Normal')
+qqline(weed_biomass_24$od_g)
+shapiro.test(weed_biomass_24$od_g)
+
+#boxcox
+bc <- boxcox(lm((weed_biomass_24$od_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+weed_biomass_24$bc_od <- ((weed_biomass_24$od_g + 1) ^ lambda -1)/lambda
+
+hist(weed_biomass_24$bc_od)
+skewness(weed_biomass_24$bc_od, na.rm = TRUE)
+qqnorm(weed_biomass_24$bc_od, main='Normal')
+qqline(weed_biomass_24$bc_od)
+shapiro.test(weed_biomass_24$bc_od)
+
+#inverse
+weed_biomass_24$inverse_od <- 1/(weed_biomass_24$od_g+1)
+
+hist(weed_biomass_24$inverse_od)
+skewness(weed_biomass_24$inverse_od, na.rm = TRUE)
+qqnorm(weed_biomass_24$inverse_od, main='Normal')
+qqline(weed_biomass_24$inverse_od)
+shapiro.test(weed_biomass_24$inverse_od)
+
+#inverse sqrt
+weed_biomass_24$sqrt_od <- 1/sqrt(weed_biomass_24$od_g+1)
+
+hist(weed_biomass_24$sqrt_od)
+skewness(weed_biomass_24$sqrt_od, na.rm = TRUE)
+qqnorm(weed_biomass_24$sqrt_od, main='Normal')
+qqline(weed_biomass_24$sqrt_od)
+shapiro.test(weed_biomass_24$sqrt_od)
+
+```
+
+### One way tests
+```{r}
+
+# Across both study years, all treatments are significantly difference
+kruskal.test(od_g ~ treatment, weed_biomass)
+dunnTest(od_g ~ treatment, weed_biomass)
+
+# There is a nearly significant difference between strawberries and collards, which appears to be largely driven by bare soil
+kruskal.test(od_g ~ crop, weed_biomass)
+dunnTest(od_g ~ crop, weed_biomass)
+
+# nearly significant difference between AS-FC
+kruskal.test(od_g ~ crop, subset(weed_biomass, treatment == "BM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, treatment == "BM"))
+
+# no difference
+kruskal.test(od_g ~ crop, subset(weed_biomass, treatment == "CM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, treatment == "CM"))
+
+# no difference
+kruskal.test(od_g ~ crop, subset(weed_biomass, treatment == "SM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, treatment == "SM"))
+
+# But the winner is that there is a significant difference between years
+kruskal.test(od_g ~ year, weed_biomass) # p < 0.001, so analyzing years separately
+
+```
+
+#### 2023
+
+```{r}
+# significant difference between CM and BM/SM
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023"))
+
+#check to see if there is a significant difference between crops within a treatment. 
+#Nearly significant difference between AS-FC
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "BM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "BM"))
+
+# no difference
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "CM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "CM"))
+
+# nearly significant difference between AS-DB
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "SM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "SM"))
+
+kruskal.test(od_g ~ weeding_point, subset(weed_biomass, year == "2023")) # p < 0.001, so analyzing each weeding point separately
+
+```
 
 ##### Weeding Day 1
 
@@ -122,7 +298,9 @@ When crops are combined, there were significantly more weeds in bare soil compar
 
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "1")) # p > 0.05, so combining crops to look at treatments
+
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "1"))
+
 dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "1")) 
 
 ```
@@ -133,7 +311,9 @@ When crops are combined, there were significantly less weed biomass under cardbo
 
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "2")) # p > 0.05, so combining crops to look at treatments
+
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "2"))
+
 dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "2")) 
 
 ```
@@ -145,19 +325,35 @@ When we reached the third weeding day, there was a significant difference in wee
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "3")) # p = 0.01, so crops are analyzed individually (plus I also combine for consistency with previous days)
 
-#Strawberries 
+#significant difference between AS-FC
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "BM" & weeding_point == "3"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "BM" & weeding_point == "3"))
+
+# no difference
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "CM" & weeding_point == "3"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "CM" & weeding_point == "3"))
+
+# nearly significant difference between AS-DB
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "SM" & weeding_point == "3"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2023" & treatment == "SM" & weeding_point == "3"))
+```
+
+
+```{r}
+
+#Strawberries: BM-CM significantly different
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "AS"))
 dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "AS")) 
 
-#Dragon tongue beans 
+#Dragon tongue beans: no significant difference 
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "DB"))
 dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "DB")) 
 
-#Collards
+#Collards: no significant difference
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "FC"))
 dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3" & crop == "FC")) 
 
-#crops combined
+#crops combined: no significant difference
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3"))
 dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "3")) 
 
@@ -169,11 +365,34 @@ Mulch treatment did not impact weed biomass during our fourth collection point (
 
 ```{r}
 kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2023" & weeding_point == "4")) # p = 0.4, so crops were combined
+
 kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2023" & weeding_point == "4"))
 
 ```
 
 #### 2024
+
+```{r}
+# significant difference between all treatments
+kruskal.test(od_g ~ treatment, subset(weed_biomass, year == "2024"))
+dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024"))
+
+#check to see if there is a significant difference between crops within a treatment. 
+# no difference
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & treatment == "BM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2024" & treatment == "BM"))
+
+# no difference
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & treatment == "CM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2024" & treatment == "CM"))
+
+# no difference
+kruskal.test(od_g ~ crop, subset(weed_biomass, year == "2024" & treatment == "SM"))
+dunnTest(od_g ~ crop, subset(weed_biomass, year == "2024" & treatment == "SM"))
+
+kruskal.test(od_g ~ weeding_point, subset(weed_biomass, year == "2024")) # p < 0.001, so analyzing each weeding point separately
+
+```
 
 ##### Weeding Day 1
 
@@ -219,11 +438,7 @@ dunnTest(od_g ~ treatment, subset(weed_biomass, year == "2024" & weeding_point =
 
 ```
 
-### Linear Mixed Model
 
-```{r}
-
-```
 
 ## Weed Labor
 
@@ -268,6 +483,20 @@ weed_labor$time_min[weed_labor$weeding_point == "2" & weed_labor$block == "1" & 
 
 ```
 
+Nearly all the outliers are from 2024. I double checked the CM one, which was the only surprising one, and it had a high biomass.
+```{r}
+Q1 <- quantile(weed_labor$time_min, 0.25, na.rm = TRUE) 
+Q3 <- quantile(weed_labor$time_min, 0.75, na.rm = TRUE) 
+IQR <- IQR(weed_labor$time_min,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+test <- subset(weed_labor, weed_labor$time_min > upper_bound | 
+                    weed_labor$time_min < lower_bound)
+
+```
+
 ### Visualization
 
 This makes me have suspicions about whether they were using hand tools to weed in 2024.
@@ -276,7 +505,9 @@ Visualizations I'm most likely to use:
 
 ```{r}
 #crops combined, year visualized by weed collection/treatment
-ggplot(weed_labor, aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+ggplot(subset(weed_labor, year == "2023"), aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot()
+
+ggplot(subset(weed_labor, year == "2024"), aes(x = weeding_point, y = time_min, fill = treatment)) + geom_boxplot()
 
 #crops and weeding point combined, visualized by treatment for each year
 ggplot(weed_labor, aes(x = as.factor(year), y = time_min, fill = treatment)) + geom_boxplot()
@@ -308,31 +539,16 @@ ggplot(weed_labor, aes(x = treatment, y = time_min)) + geom_boxplot()
 
 ### Normality
 
+#### overall
+The original dataset is non-parametric. Lambda indicates a boxcox or log transformation would be most appropriate.Neither is actually successful, but boxcox gets very close
 ```{r}
 hist(weed_labor$time_min)
 skewness(weed_labor$time_min, na.rm = TRUE)
 qqnorm(weed_labor$time_min, main='Normal')
 qqline(weed_labor$time_min)
 shapiro.test(weed_labor$time_min)
-```
 
-#### log transformation
-
-```{r}
-weed_labor$log_time <- log10(weed_labor$time_min)
-hist(weed_labor$log_time)
-skewness(weed_labor$log_time, na.rm = TRUE)
-qqnorm(weed_labor$log_time, main='Normal')
-qqline(weed_labor$log_time)
-shapiro.test(weed_labor$log_time)
-
-```
-
-#### boxcox transformation
-
-This gets me slightly closer to a normal distribution
-
-```{r}
+#boxcox
 bc <- boxcox(lm(weed_labor$time_min ~ 1))
 lambda <- bc$x[which.max(bc$y)]
 weed_labor$bc_time <- (weed_labor$time_min ^ lambda -1)/lambda
@@ -343,212 +559,150 @@ qqnorm(weed_labor$bc_time, main='Normal')
 qqline(weed_labor$bc_time)
 shapiro.test(weed_labor$bc_time)
 
-```
-
-### ANOVA
-
-#### Initial
-
-```{r}
-#This demonstrates treatment, crop, and year have a significant effect == but only treatment year has a significant interaction effect. 
-aov <- aov(bc_time ~ treatment*crop*year, data = weed_labor)
-summary(aov)
-TukeyHSD(aov)
-
-#Based on broader results above, I'm analyzing each year separtely. 
-#In this first ANOVA for 2023, only treatment is significant
-aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2023"))
-summary(aov)
-TukeyHSD(aov)
-
-# In 2023, both ANOVA and KW found that bare soil and cardboard mulch required similar time to weed, and straw mulch was significantly different from both
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023"))
-summary(aov)
-TukeyHSD(aov)
-
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023"))
-
-# In 2024, there was once again no interaction between treatment and crop. Crop had a potential significant impact on weeding time (0.05) in the ANOVA, but not the Tukey HSD
-aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2024"))
-summary(aov)
-TukeyHSD(aov)
-
-
-# In 2024, from ANOVA and KW, we saw a different trend. This year, cardboard mulch required significantly less weeding time than both bare soil and straw mulch (and there was no significant difference between bare soil and straw).
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024"))
-summary(aov)
-TukeyHSD(aov)
-
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024"))
-
-# Still, I'm curious about if we analyze the years together. Using the ANOVA, cardboard mulch is significantly different from bare soil and straw. Straw mulch and bare soil are *nearly* significantly different (0.06). In the KW, all treatments are significantly different from each other
-aov <- aov(bc_time ~ treatment, data = weed_labor)
-summary(aov)
-TukeyHSD(aov)
-
-kruskal.test(time_min ~ treatment, data = weed_labor)
-dunnTest(time_min ~ treatment, data = weed_labor)
+#log
+weed_labor$log_time <- log10(weed_labor$time_min)
+hist(weed_labor$log_time)
+skewness(weed_labor$log_time, na.rm = TRUE)
+qqnorm(weed_labor$log_time, main='Normal')
+qqline(weed_labor$log_time)
+shapiro.test(weed_labor$log_time)
 
 ```
 
-#### 2023
-
-note that I did check each week for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model.
-
-##### Weeding Day 1
-
-Straw mulch is significantly different from cardboard and bare soil. Cardboard is nearly significantly different (0.06). KW test shows slightly different results; only straw mulch and cardboard mulch are significantly different
-
+#### 2023 
+The original dataset is non-parametric. Lambda is close to 0, indicating boxcox or log would be most appropriate. Both are successful, but boxcox has a better distribution
 ```{r}
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "1"))
-summary(aov)
-TukeyHSD(aov)
+weed_labor_23 <- subset(weed_labor, year == "2023")
 
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "1"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "1"))
+# there are a couple bare soils that took longer than I think they needed to. I suspect that they were weeded by hand, rather than with tools
+Q1 <- quantile(weed_labor_23$time_min, 0.25, na.rm = TRUE) 
+Q3 <- quantile(weed_labor_23$time_min, 0.75, na.rm = TRUE) 
+IQR <- IQR(weed_labor_23$time_min,na.rm = TRUE)
 
-```
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
 
-##### Weeding Day 2
+test <- subset(weed_labor_23, weed_labor_23$time_min > upper_bound | 
+                    weed_labor_23$time_min < lower_bound)
 
-Straw mulch is significantly different from cardboard and bare soil.
+hist(weed_labor_23$time_min)
+skewness(weed_labor_23$time_min, na.rm = TRUE)
+qqnorm(weed_labor_23$time_min, main='Normal')
+qqline(weed_labor_23$time_min)
+shapiro.test(weed_labor_23$time_min)
 
-```{r}
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "2"))
-summary(aov)
-TukeyHSD(aov)
+#boxcox
+bc <- boxcox(lm(weed_labor_23$time_min ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+weed_labor_23$bc_time <- (weed_labor_23$time_min ^ lambda -1)/lambda
 
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "2"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "2"))
+hist(weed_labor_23$bc_time)
+skewness(weed_labor_23$bc_time, na.rm = TRUE)
+qqnorm(weed_labor_23$bc_time, main='Normal')
+qqline(weed_labor_23$bc_time)
+shapiro.test(weed_labor_23$bc_time)
 
-```
-
-##### Weeding Day 3
-
-In a one-way for treatment, straw mulch is significantly different from bare soil and cardboard mulch.
-
-In a one-way for crop, there were no significant differences.
-
-Looking at interactions, a significant difference between FC and DB appeared (0.04). The Tukey HSD indicates that: BM: no significant difference between crops SM: no significant difference between crops CM: no significant difference between crops
-
-AS: straw is significantly different from bare soil DB: no significant difference between mulch treatments FC: straw is significantly different from bare soil
-
-```{r}
-aov <- aov(bc_time ~ treatment+crop, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
-summary(aov)
-TukeyHSD(aov)
-
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
-
-
-aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2023" & weeding_point == "3"))
-summary(aov)
-TukeyHSD(aov)
-
-
-
-```
-
-##### Weeding Day 4
-
-According to the ANOVA, all mulches are signifcantly different from each other. According to the KW, only straw mulch and cardboard mulch are significantly different (though the others are close)
-
-```{r}
-
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "4"))
-summary(aov)
-TukeyHSD(aov)
-
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "4"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2023" & weeding_point == "4"))
+#log
+weed_labor_23$log_time <- log10(weed_labor_23$time_min)
+hist(weed_labor_23$log_time)
+skewness(weed_labor_23$log_time, na.rm = TRUE)
+qqnorm(weed_labor_23$log_time, main='Normal')
+qqline(weed_labor_23$log_time)
+shapiro.test(weed_labor_23$log_time)
 
 ```
 
 #### 2024
-
-note that I did check each weeding day for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model.
-
-##### Weeding Day 1
-
-No significant difference between mulch treatments
-
+The original dataset is non-parametric. Lambda is close to 0, indicating boxcox or log would be most appropriate. Only boxcox is successful
 ```{r}
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
-summary(aov)
-TukeyHSD(aov)
+weed_labor_24 <- subset(weed_labor, year == "2024")
 
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "1"))
+# no outliers when just looking at 2024
+Q1 <- quantile(weed_labor_24$time_min, 0.25, na.rm = TRUE) 
+Q3 <- quantile(weed_labor_24$time_min, 0.75, na.rm = TRUE) 
+IQR <- IQR(weed_labor_24$time_min,na.rm = TRUE)
+
+lower_bound <- Q1 - (1.5*IQR)
+upper_bound <- Q3 + (1.5*IQR)
+
+test <- subset(weed_labor_24, weed_labor_24$time_min > upper_bound | 
+                    weed_labor_24$time_min < lower_bound)
+
+hist(weed_labor_24$time_min)
+skewness(weed_labor_24$time_min, na.rm = TRUE)
+qqnorm(weed_labor_24$time_min, main='Normal')
+qqline(weed_labor_24$time_min)
+shapiro.test(weed_labor_24$time_min)
+
+#boxcox
+bc <- boxcox(lm(weed_labor_24$time_min ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+weed_labor_24$bc_time <- (weed_labor_24$time_min ^ lambda -1)/lambda
+
+hist(weed_labor_24$bc_time)
+skewness(weed_labor_24$bc_time, na.rm = TRUE)
+qqnorm(weed_labor_24$bc_time, main='Normal')
+qqline(weed_labor_24$bc_time)
+shapiro.test(weed_labor_24$bc_time)
+
+#log
+weed_labor_24$log_time <- log10(weed_labor_24$time_min)
+hist(weed_labor_24$log_time)
+skewness(weed_labor_24$log_time, na.rm = TRUE)
+qqnorm(weed_labor_24$log_time, main='Normal')
+qqline(weed_labor_24$log_time)
+shapiro.test(weed_labor_24$log_time)
+
+#sqrt
+weed_labor_24$sqrt_time <- sqrt(weed_labor_24$time_min)
+hist(weed_labor_24$sqrt_time)
+skewness(weed_labor_24$sqrt_time, na.rm = TRUE)
+qqnorm(weed_labor_24$sqrt_time, main='Normal')
+qqline(weed_labor_24$sqrt_time)
+shapiro.test(weed_labor_24$sqrt_time)
 
 ```
 
-##### Weeding Day 2
 
-According to the ANOVA, cardboard mulch was significantly different from bare soil and straw. Note that the LMM for block showed that block impacted results, though ultimately the relationship between treatments was the same.
-
-According to the KW, though, cardboard was only significantly different from bare soil
+### One way tests
 
 ```{r}
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "2"))
+#This demonstrates treatment, crop, and year have a significant effect, but only treatment year has a significant interaction effect. 
+aov <- aov(bc_time ~ treatment*crop*year, data = weed_labor)
 summary(aov)
 TukeyHSD(aov)
+AIC(aov)
+plot(aov)
 
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "2"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "2"))
-
-```
-
-##### Weeding Day 3
-
-cardboard wasn't quite significantly different from bare soil (0.06), though it becomes significant (0.04) if crop is added (though there are no significant differences between crops, nor are there any significant interactions)
-
-In the KW, cardboard and straw are significantly different
-
-```{r}
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
+# treatment, year, and interactions all significant
+aov <- aov(bc_time ~ treatment*year, data = weed_labor)
 summary(aov)
 TukeyHSD(aov)
+AIC(aov)
+plot(aov)
 
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
+#LMM: block is not a significant RE
+model <- lmer(bc_time ~ treatment*year + (1 | block), data = weed_labor)
+AIC(model)
+summary(model)
 
-aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2024" & weeding_point == "3"))
-summary(aov)
-TukeyHSD(aov)
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
 
-```
+#generate qqplot
+plot(re)
 
-##### Weeding Day 4
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 
-According to both ANOVA and KW, cardboard was significantly different from bare soil and straw. There was a significant difference for crops as well, between collards and strawberries/beans. Looking at interactions:
+#ranked likelihood test
+ranova(model)
 
-BM: no significant difference between crops CM: no significant difference between crops (FC and DB nearly so, though) SM: no significant difference between crops
+emmeans(model, pairwise ~ treatment)
 
-AS: cardboard was significantly different from bare soil & straw DB: no significant difference between mulches FC: cardboard was significantly different from bare soil
-
-There's a handful of other interactions for different crop/mulch combinations, but not taking the time to go through them right now
-
-```{r}
-aov <- aov(bc_time ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
-summary(aov)
-TukeyHSD(aov)
-
-kruskal.test(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
-dunnTest(time_min ~ treatment, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
-
-aov <- aov(bc_time ~ treatment*crop, data = subset(weed_labor, year == "2024" & weeding_point == "4"))
-summary(aov)
-TukeyHSD(aov)
-
-```
-
-### Linear Mixed Model
-
-```{r}
-model <- lmer(bc_time ~ treatment*block + (1 | block), data = subset(weed_labor, year == "2024"))
+#LMM: weeding point is a significant RE, and so is block in this context
+model <- lmer(bc_time ~ treatment*year + (1 | weeding_point/block), data = weed_labor)
 AIC(model)
 summary(model)
 
@@ -568,3 +722,496 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 ```
+```{r}
+# Using the ANOVA, cardboard mulch is significantly different from bare soil and straw. Straw mulch and bare soil are *nearly* significantly different (0.06). In the KW, all treatments are significantly different from each other
+aov <- aov(bc_time ~ treatment, data = weed_labor)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#LMM
+model <- lmer(bc_time ~ treatment + (1 | weeding_point/block), data = weed_labor)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+```{r}
+
+# Across both study years, all treatments are significantly difference
+kruskal.test(time_min ~ treatment, weed_labor)
+dunnTest(time_min ~ treatment, weed_labor)
+
+# There is a nearly significant difference between DB-FC
+kruskal.test(time_min ~ crop, weed_labor)
+dunnTest(time_min ~ crop, weed_labor)
+
+# no difference
+kruskal.test(time_min ~ crop, subset(weed_labor, treatment == "BM"))
+dunnTest(time_min ~ crop, subset(weed_labor, treatment == "BM"))
+
+# no difference
+kruskal.test(time_min ~ crop, subset(weed_labor, treatment == "CM"))
+dunnTest(time_min ~ crop, subset(weed_labor, treatment == "CM"))
+
+# no difference. nearly significant difference between AS-FC
+kruskal.test(time_min ~ crop, subset(weed_labor, treatment == "SM"))
+dunnTest(time_min ~ crop, subset(weed_labor, treatment == "SM"))
+
+# But the winner is that there is a significant difference between years
+kruskal.test(time_min ~ year, weed_labor) # p < 0.001, so analyzing years separately
+
+```
+
+
+
+#### 2023
+
+
+```{r}
+
+#Based on broader results above, I'm analyzing each year separately. 
+#ANOVA: Straw is significantly different from BM and CM
+aov <- aov(bc_time ~ treatment, data = weed_labor_23)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#ANOVA: checking for significant differences between crops - there are none
+aov <- aov(bc_time ~ treatment*crop, data = weed_labor_23)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# KW: Straw is significantly different from BM and CM
+kruskal.test(time_min ~ treatment, data = weed_labor_23)
+dunnTest(time_min ~ treatment, data = weed_labor_23)
+
+# LMM: weeding point is a significant RE 
+model <- lmer(bc_time ~ treatment + (1 | weeding_point), data = weed_labor_23)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# LMM: only weeding point is a significant RE 
+model <- lmer(bc_time ~ treatment + (1 | weeding_point/block), data = weed_labor_23)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+
+##### Weeding Day 1
+
+Straw mulch is significantly different from cardboard and bare soil. Cardboard is nearly significantly different (0.05). KW test shows slightly different results; only straw mulch and cardboard mulch are significantly different
+
+```{r}
+#ANOVA: significant difference between SM and BM/CM. A very nearly significant difference between BM/CM as well.
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_23, weeding_point == "1"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: only significant difference is SM-CM, but the others are close to being significant
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "1"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "1"))
+
+#LMM: block is not a significant RE
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_23, weeding_point == "1"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+```
+
+##### Weeding Day 2
+
+Straw mulch is significantly different from cardboard and bare soil.
+
+```{r}
+#ANOVA: significant difference between SM and BM/CM. 
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_23, weeding_point == "2"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: significant difference between SM and BM/CM. 
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "2"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "2"))
+
+#LMM: block is not a significant RE
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_23, weeding_point == "2"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+##### Weeding Day 3
+
+```{r}
+#ANOVA: significant difference between SM and BM/CM. 
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_23, weeding_point == "3"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: significant difference between SM and BM/CM. 
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "3"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "3"))
+
+#LMM: isSingular error
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_23, weeding_point == "3"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+##### Weeding Day 4
+
+According to the ANOVA, all mulches are signifcantly different from each other. According to the KW, only straw mulch and cardboard mulch are significantly different (though the others are close)
+
+```{r}
+
+#ANOVA: significant difference between SM and BM/CM. 
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_23, weeding_point == "4"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: significant difference between SM and BM/CM. 
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "4"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_23, weeding_point == "4"))
+
+#LMM: isSingular error
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_23, weeding_point == "4"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+#### 2024
+
+note that I did check each weeding day for interactions with crop. I also ran LMMs for each weeding day with block as the random effect; it did not significantly improve the model.
+
+```{r}
+
+#Based on broader results above, I'm analyzing each year separately. 
+#ANOVA: cardboard is significantly different from BM and SM
+aov <- aov(bc_time ~ treatment, data = weed_labor_24)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#ANOVA: checking for significant differences between crops - there are none
+aov <- aov(bc_time ~ treatment*crop, data = weed_labor_24)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# KW: Straw is significantly different from BM and CM
+kruskal.test(time_min ~ treatment, data = weed_labor_24)
+dunnTest(time_min ~ treatment, data = weed_labor_24)
+
+# LMM: weeding point is a significant RE 
+model <- lmer(bc_time ~ treatment + (1 | weeding_point), data = weed_labor_24)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# LMM: only weeding point is a significant RE 
+model <- lmer(bc_time ~ treatment + (1 | weeding_point/block), data = weed_labor_24)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+
+```
+
+##### Weeding Day 1
+
+No significant difference between mulch treatments
+
+```{r}
+#ANOVA: no differences
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_24, weeding_point == "1"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: no differences
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "1"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "1"))
+
+#LMM: block is not a significant RE
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_24, weeding_point == "1"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+##### Weeding Day 2
+
+```{r}
+#ANOVA: significant difference between BM/CM. 
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_24, weeding_point == "2"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: significant difference between BM/CM. 
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "2"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "2"))
+
+#LMM: block is a significant RE. also a sig dif between CM-SM
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_24, weeding_point == "2"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+##### Weeding Day 3
+
+```{r}
+#ANOVA: no differences. nearly significant difference between SM and BM/CM. 
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_24, weeding_point == "3"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: no differences. near significant difference between SM and BM/CM. 
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "3"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "3"))
+
+#LMM: block is not a significant RE
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_24, weeding_point == "3"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+##### Weeding Day 4
+
+```{r}
+#ANOVA: significant difference between SM and BM/CM. 
+aov <- aov(bc_time ~ treatment, data = subset(weed_labor_24, weeding_point == "4"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: significant difference between SM and BM/CM. 
+kruskal.test(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "4"))
+dunnTest(time_min ~ treatment, data = subset(weed_labor_24, weeding_point == "4"))
+
+#LMM: isSingular error
+model <- lmer(bc_time ~ treatment + (1 | block), data = subset(weed_labor_24, weeding_point == "4"))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+

@@ -17,6 +17,7 @@ library(lme4)         #mixed models
 library(lmerTest)     #mixed models
 library(broom.mixed)  #mixed models
 library(emmeans)
+library(moments)
 
 ```
 
@@ -209,7 +210,9 @@ irrigation_yr <- irrigation_day %>%
 ### Soil Moisture
 ```{r}
 #formatting data frame for soil moisture data from TDR
-soil_vwc <- soil_vwc %>%
+
+
+soil_vwc_full <- soil_vwc %>%
             subset(block != "5") %>%
             dplyr::select('sample_date', 'block','plot', 'treatment', 'crop', 
                           'bed_location', 'vwc_percent', 'period', 'EC')  %>%
@@ -221,6 +224,14 @@ soil_vwc <- soil_vwc %>%
                    bed_location = ifelse(bed_location == "hose", "center", bed_location)) %>%
             mutate_at(c('year', 'block', 'plot', 'treatment', 'crop', 'bed_location'), 
                       as.factor) 
+
+#this data frame is only the measurements taken the day mulch was applied in 2023
+soil_vwc_pre <- soil_vwc_full %>%
+                subset(sample_date < "2023-06-23")
+
+#this data frame excludes the measurments taken the day mulch was applied in 2023
+soil_vwc <- soil_vwc_full %>%
+            subset(sample_date > "2023-06-23")
 
 #formatting data frame from continuous logger
 soil_vwc_rt <- soil_vwc_rt %>%
@@ -320,7 +331,7 @@ Following differences in average air temp, soil temperature was higher in 2023 c
 ```{r}
 # Make a table for this data
 
-subset(soil_temp_month, month > 5 & month < 11)
+subset(soil_temp_month, month > 4 & month < 11)
 
 ```
 
@@ -477,128 +488,337 @@ ggplot(subset(soil_vwc, year == 2024 & bed_location == "edge"), aes(x = as.facto
 
 
 ### Normality
-(note to self to try analyzing the bed locations separately, see if there is a difference)
 
+#### Overall 
 
-I have tried as many things I can think of for these transformations - boxcox, log, cubic, sqrt, and all for negatively skewed data. I also tried splitting the dataset into edge and center, and then running transformations. And the wild thing is that, visually, it looks like the most normally distributed dataset I've ever gotten to deal with 
+The original dataset is non-parametric with a lambda of 1.3, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
 ```{r}
-library(moments)
-library(ggpubr)
-
+#original dataset
 hist(soil_vwc$vwc_percent)
 skewness(soil_vwc$vwc_percent, na.rm = TRUE)
 qqnorm(soil_vwc$vwc_percent, main='Normal')
 qqline(soil_vwc$vwc_percent)
-
 shapiro.test(soil_vwc$vwc_percent)
 
-```
-
-Box cox
-```{r}
-
-ggdensity(soil_vwc, x = "vwc_percent", fill = "lightgray", title = "vwc_percent") +
-  scale_x_continuous(limits = c(3, 12)) +
-  stat_overlay_normal_density(color = "red", linetype = "dashed")
-
-bc <- boxcox(soil_vwc$vwc_percent ~ 1, lambda = seq(-6,6,0.1))
+#boxcox
+bc <- boxcox(lm(soil_vwc$vwc_percent ~ 1))
 lambda <- bc$x[which.max(bc$y)]
 soil_vwc$bc_vwc <- (soil_vwc$vwc_percent ^ lambda-1)/lambda
-skewness(soil_vwc$bc_vwc, na.rm = TRUE)
 
+skewness(soil_vwc$bc_vwc, na.rm = TRUE)
 hist(soil_vwc$bc_vwc)
 qqnorm(soil_vwc$bc_vwc, main='Normal')
 qqline(soil_vwc$bc_vwc)
-
 shapiro.test(soil_vwc$bc_vwc)
 
+#squared
+soil_vwc$sq_vwc <- soil_vwc$vwc_percent^2
 
-ggdensity(soil_vwc, x = "bc_vwc", fill = "lightgray", title = "vwc_percent") +
-  scale_x_continuous(limits = c(3, 12)) +
-  stat_overlay_normal_density(color = "red", linetype = "dashed")
+skewness(soil_vwc$sq_vwc, na.rm = TRUE)
+hist(soil_vwc$sq_vwc)
+qqnorm(soil_vwc$sq_vwc, main='Normal')
+qqline(soil_vwc$sq_vwc)
+shapiro.test(soil_vwc$sq_vwc)
+
+```
+2023: the original dataset is non-parametric with a lambda ~1, indicating that a boxcox transformation would be most appropriate. It is not successful
+```{r}
+soil_vwc_23 <- subset(soil_vwc, year == "2023")
+
+#original dataset
+hist(soil_vwc_23$vwc_percent)
+skewness(soil_vwc_23$vwc_percent, na.rm = TRUE)
+qqnorm(soil_vwc_23$vwc_percent, main='Normal')
+qqline(soil_vwc_23$vwc_percent)
+shapiro.test(soil_vwc_23$vwc_percent)
+
+#boxcox
+bc <- boxcox(lm(soil_vwc_23$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_vwc_23$bc_vwc <- (soil_vwc_23$vwc_percent ^ lambda-1)/lambda
+
+skewness(soil_vwc_23$bc_vwc, na.rm = TRUE)
+hist(soil_vwc_23$bc_vwc)
+qqnorm(soil_vwc_23$bc_vwc, main='Normal')
+qqline(soil_vwc_23$bc_vwc)
+shapiro.test(soil_vwc_23$bc_vwc)
+
 
 ```
 
-Square root
+2024: the original dataset is non-parametric with a lambda ~2, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
 ```{r}
+soil_vwc_24 <- subset(soil_vwc, year == "2024")
 
-soil_vwc$sqrt_vwc <- sqrt(max(soil_vwc$vwc_percent +1, na.rm = TRUE) - soil_vwc$vwc_percent)
+#original dataset
+hist(soil_vwc_24$vwc_percent)
+skewness(soil_vwc_24$vwc_percent, na.rm = TRUE)
+qqnorm(soil_vwc_24$vwc_percent, main='Normal')
+qqline(soil_vwc_24$vwc_percent)
+shapiro.test(soil_vwc_24$vwc_percent)
 
-skewness(soil_vwc$sqrt_vwc, na.rm = TRUE)
+#boxcox
+bc <- boxcox(lm(soil_vwc_24$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+soil_vwc_24$bc_vwc <- (soil_vwc_24$vwc_percent ^ lambda-1)/lambda
 
-hist(soil_vwc$sqrt_vwc)
-qqnorm(soil_vwc$sqrt_vwc, main='Normal')
-qqline(soil_vwc$sqrt_vwc)
+skewness(soil_vwc_24$bc_vwc, na.rm = TRUE)
+hist(soil_vwc_24$bc_vwc)
+qqnorm(soil_vwc_24$bc_vwc, main='Normal')
+qqline(soil_vwc_24$bc_vwc)
+shapiro.test(soil_vwc_24$bc_vwc)
 
-shapiro.test(soil_vwc$sqrt_vwc)
+#squared
+soil_vwc_24$sq_vwc <- soil_vwc_24$vwc_percent^2
 
-
-ggdensity(soil_vwc, x = "sqrt_vwc", fill = "lightgray", title = "vwc_percent") +
-  scale_x_continuous(limits = c(3, 12)) +
-  stat_overlay_normal_density(color = "red", linetype = "dashed")
+skewness(soil_vwc_24$sq_vwc, na.rm = TRUE)
+hist(soil_vwc_24$sq_vwc)
+qqnorm(soil_vwc_24$sq_vwc, main='Normal')
+qqline(soil_vwc_24$sq_vwc)
+shapiro.test(soil_vwc_24$sq_vwc)
 ```
 
-### ANOVA 
+#### Center only 
 
-
-#### overall
+The original dataset is non-parametric with a lambda of 1.4, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
 ```{r}
-model <- aov(sqrt_vwc ~ treatment*crop, soil_vwc)
+center_vwc <- subset(soil_vwc, bed_location == "center")
+
+#original dataset
+hist(center_vwc$vwc_percent)
+skewness(center_vwc$vwc_percent, na.rm = TRUE)
+qqnorm(center_vwc$vwc_percent, main='Normal')
+qqline(center_vwc$vwc_percent)
+shapiro.test(center_vwc$vwc_percent)
+
+#boxcox
+bc <- boxcox(lm(center_vwc$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+center_vwc$bc_vwc <- (center_vwc$vwc_percent ^ lambda-1)/lambda
+
+skewness(center_vwc$bc_vwc, na.rm = TRUE)
+hist(center_vwc$bc_vwc)
+qqnorm(center_vwc$bc_vwc, main='Normal')
+qqline(center_vwc$bc_vwc)
+shapiro.test(center_vwc$bc_vwc)
+
+#squared
+center_vwc$sq_vwc <- center_vwc$vwc_percent^2
+
+skewness(center_vwc$sq_vwc, na.rm = TRUE)
+hist(center_vwc$sq_vwc)
+qqnorm(center_vwc$sq_vwc, main='Normal')
+qqline(center_vwc$sq_vwc)
+shapiro.test(center_vwc$sq_vwc)
+
+```
+
+2023 only: The original dataset is non-parametric with a lambda of 1.3, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
+```{r}
+center_vwc_23 <- subset(center_vwc, year == "2023")
+
+#original dataset
+hist(center_vwc_23$vwc_percent)
+skewness(center_vwc_23$vwc_percent, na.rm = TRUE)
+qqnorm(center_vwc_23$vwc_percent, main='Normal')
+qqline(center_vwc_23$vwc_percent)
+shapiro.test(center_vwc_23$vwc_percent)
+
+#boxcox
+bc <- boxcox(lm(center_vwc_23$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+center_vwc_23$bc_vwc <- (center_vwc_23$vwc_percent ^ lambda-1)/lambda
+
+skewness(center_vwc_23$bc_vwc, na.rm = TRUE)
+hist(center_vwc_23$bc_vwc)
+qqnorm(center_vwc_23$bc_vwc, main='Normal')
+qqline(center_vwc_23$bc_vwc)
+shapiro.test(center_vwc_23$bc_vwc)
+
+#squared
+center_vwc_23$sq_vwc <- center_vwc_23$vwc_percent^2
+
+skewness(center_vwc_23$sq_vwc, na.rm = TRUE)
+hist(center_vwc_23$sq_vwc)
+qqnorm(center_vwc_23$sq_vwc, main='Normal')
+qqline(center_vwc_23$sq_vwc)
+shapiro.test(center_vwc_23$sq_vwc)
+
+```
+
+2024 only: The original dataset is non-parametric with a lambda of 1.8, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
+```{r}
+center_vwc_24 <- subset(center_vwc, year == "2024")
+
+#original dataset
+hist(center_vwc_24$vwc_percent)
+skewness(center_vwc_24$vwc_percent, na.rm = TRUE)
+qqnorm(center_vwc_24$vwc_percent, main='Normal')
+qqline(center_vwc_24$vwc_percent)
+shapiro.test(center_vwc_24$vwc_percent)
+
+#boxcox
+bc <- boxcox(lm(center_vwc_24$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+center_vwc_24$bc_vwc <- (center_vwc_24$vwc_percent ^ lambda-1)/lambda
+
+skewness(center_vwc_24$bc_vwc, na.rm = TRUE)
+hist(center_vwc_24$bc_vwc)
+qqnorm(center_vwc_24$bc_vwc, main='Normal')
+qqline(center_vwc_24$bc_vwc)
+shapiro.test(center_vwc_24$bc_vwc)
+
+#squared
+center_vwc_24$sq_vwc <- center_vwc_24$vwc_percent^2
+
+skewness(center_vwc_24$sq_vwc, na.rm = TRUE)
+hist(center_vwc_24$sq_vwc)
+qqnorm(center_vwc_24$sq_vwc, main='Normal')
+qqline(center_vwc_24$sq_vwc)
+shapiro.test(center_vwc_24$sq_vwc)
+
+```
+
+
+#### Edge only 
+
+The original dataset is non-parametric with a lambda of 1, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
+```{r}
+edge_vwc <- subset(soil_vwc, bed_location == "edge")
+
+#original dataset
+hist(edge_vwc$vwc_percent)
+skewness(edge_vwc$vwc_percent, na.rm = TRUE)
+qqnorm(edge_vwc$vwc_percent, main='Normal')
+qqline(edge_vwc$vwc_percent)
+shapiro.test(edge_vwc$vwc_percent)
+
+#boxcox
+bc <- boxcox(lm(edge_vwc$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+edge_vwc$bc_vwc <- (edge_vwc$vwc_percent ^ lambda-1)/lambda
+
+skewness(edge_vwc$bc_vwc, na.rm = TRUE)
+hist(edge_vwc$bc_vwc)
+qqnorm(edge_vwc$bc_vwc, main='Normal')
+qqline(edge_vwc$bc_vwc)
+shapiro.test(edge_vwc$bc_vwc)
+
+```
+
+2023 only: The original dataset is non-parametric with a lambda of 0.2, indicating that a boxcox or log transformation would be most appropriate. Neither is successful
+```{r}
+edge_vwc_23 <- subset(edge_vwc, year == "2023")
+
+#original dataset
+hist(edge_vwc_23$vwc_percent)
+skewness(edge_vwc_23$vwc_percent, na.rm = TRUE)
+qqnorm(edge_vwc_23$vwc_percent, main='Normal')
+qqline(edge_vwc_23$vwc_percent)
+shapiro.test(edge_vwc_23$vwc_percent)
+
+#boxcox
+bc <- boxcox(lm(edge_vwc_23$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+edge_vwc_23$bc_vwc <- (edge_vwc_23$vwc_percent ^ lambda-1)/lambda
+
+skewness(edge_vwc_23$bc_vwc, na.rm = TRUE)
+hist(edge_vwc_23$bc_vwc)
+qqnorm(edge_vwc_23$bc_vwc, main='Normal')
+qqline(edge_vwc_23$bc_vwc)
+shapiro.test(edge_vwc_23$bc_vwc)
+
+#log
+edge_vwc_23$log_vwc <- log(edge_vwc_23$vwc_percent)
+
+skewness(edge_vwc_23$log_vwc, na.rm = TRUE)
+hist(edge_vwc_23$log_vwc)
+qqnorm(edge_vwc_23$log_vwc, main='Normal')
+qqline(edge_vwc_23$log_vwc)
+shapiro.test(edge_vwc_23$log_vwc)
+
+```
+
+2024 only: The original dataset is non-parametric with a lambda of 2, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
+```{r}
+edge_vwc_24 <- subset(edge_vwc, year == "2024")
+
+#original dataset
+hist(edge_vwc_24$vwc_percent)
+skewness(edge_vwc_24$vwc_percent, na.rm = TRUE)
+qqnorm(edge_vwc_24$vwc_percent, main='Normal')
+qqline(edge_vwc_24$vwc_percent)
+shapiro.test(edge_vwc_24$vwc_percent)
+
+#boxcox
+bc <- boxcox(lm(edge_vwc_24$vwc_percent ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+edge_vwc_24$bc_vwc <- (edge_vwc_24$vwc_percent ^ lambda-1)/lambda
+
+skewness(edge_vwc_24$bc_vwc, na.rm = TRUE)
+hist(edge_vwc_24$bc_vwc)
+qqnorm(edge_vwc_24$bc_vwc, main='Normal')
+qqline(edge_vwc_24$bc_vwc)
+shapiro.test(edge_vwc_24$bc_vwc)
+
+#squared
+edge_vwc_24$sq_vwc <- edge_vwc_24$vwc_percent^2
+
+skewness(edge_vwc_24$sq_vwc, na.rm = TRUE)
+hist(edge_vwc_24$sq_vwc)
+qqnorm(edge_vwc_24$sq_vwc, main='Normal')
+qqline(edge_vwc_24$sq_vwc)
+shapiro.test(edge_vwc_24$sq_vwc)
+
+```
+
+### Analysis 
+
+
+#### Both bed locations
+
+##### Overall
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop*year, soil_vwc)
 AIC(model)
 summary(model)
 TukeyHSD(model)
+plot(model)
 
-model <- aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023"))
+model <- aov(vwc_percent ~ treatment*year, soil_vwc)
 AIC(model)
 summary(model)
 TukeyHSD(model)
+plot(model)
 
-model <- aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024"))
+model <- aov(vwc_percent ~ crop*year, soil_vwc)
 AIC(model)
 summary(model)
 TukeyHSD(model)
-```
+plot(model)
 
+model <- aov(vwc_percent ~ treatment*crop, soil_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
 
-#### 2023
-If I need to go forward with weekly analysis, then I would need to do Tukey HSD tests
-```{r}
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "25")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "26")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "27")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "28")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "29")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "30")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "31")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "35")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "36")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "37")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "38")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "39")))
+#KW
+kruskal.test(vwc_percent~treatment, data = soil_vwc)
+dunnTest(vwc_percent~treatment, data = soil_vwc)
 
-```
+kruskal.test(vwc_percent~crop, data = soil_vwc)
+dunnTest(vwc_percent~crop, data = soil_vwc)
 
-#### 2024
-If I need to go forward with weekly analysis, then I would need to do Tukey HSD tests
-```{r}
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "27")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "28")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "29")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "30")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "32")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "33")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "34")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "35")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "36")))
-summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "39")))
+kruskal.test(vwc_percent~year, data = soil_vwc)
 
-```
+kruskal.test(vwc_percent~year, data = subset(soil_vwc, crop == "AS"))
+kruskal.test(vwc_percent~year, data = subset(soil_vwc, crop == "DB"))
+kruskal.test(vwc_percent~year, data = subset(soil_vwc, crop == "FC"))
 
-### Linear Mixed Model
-Noting that model results live here: https://docs.google.com/spreadsheets/d/16b8dL3h7Hl0gyc-eoVd-CrQ_Gf6J7o4LrDXqP7GE_BE/edit?gid=0#gid=0
-```{r}
-
-model <- lmer(sqrt_vwc ~ treatment*crop + (1 | year/week/block), data = soil_vwc)
+#LMM
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date/block), data = soil_vwc)
 AIC(model)
 summary(model)
 
@@ -615,7 +835,533 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 #ranked likelihood test
 ranova(model)
 
-emmeans(model, pairwise ~ treatment*crop)
+emmeans(model, pairwise ~ treatment)
+
+```
+##### 2023
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop, soil_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment, soil_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop, soil_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = soil_vwc_23)
+dunnTest(vwc_percent~treatment, data = soil_vwc_23)
+
+kruskal.test(vwc_percent~crop, data = soil_vwc_23)
+dunnTest(vwc_percent~crop, data = soil_vwc_23)
+
+kruskal.test(vwc_percent~treatment, data = subset(soil_vwc_23, crop == "AS"))
+dunnTest(vwc_percent~treatment, data = subset(soil_vwc_23, crop == "AS"))
+
+kruskal.test(vwc_percent~treatment, data = subset(soil_vwc_23, crop == "DB"))
+dunnTest(vwc_percent~treatment, data = subset(soil_vwc_23, crop == "DB"))
+
+kruskal.test(vwc_percent~treatment, data = subset(soil_vwc_23, crop == "FC"))
+dunnTest(vwc_percent~treatment, data = subset(soil_vwc_23, crop == "FC"))
+
+#LMM
+model <- lmer(vwc_percent ~ crop + (1 | sample_date/block), data = soil_vwc_23)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ crop)
+
+```
+##### 2024
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop, soil_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment, soil_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop, soil_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = soil_vwc_24)
+dunnTest(vwc_percent~treatment, data = soil_vwc_24)
+
+kruskal.test(vwc_percent~crop, data = soil_vwc_24)
+dunnTest(vwc_percent~crop, data = soil_vwc_24)
+
+kruskal.test(vwc_percent~treatment, data = subset(soil_vwc_24, crop == "AS"))
+dunnTest(vwc_percent~treatment, data = subset(soil_vwc_24, crop == "AS"))
+
+kruskal.test(vwc_percent~treatment, data = subset(soil_vwc_24, crop == "DB"))
+dunnTest(vwc_percent~treatment, data = subset(soil_vwc_24, crop == "DB"))
+
+kruskal.test(vwc_percent~treatment, data = subset(soil_vwc_24, crop == "FC"))
+dunnTest(vwc_percent~treatment, data = subset(soil_vwc_24, crop == "FC"))
+
+#LMM: these really don't look normally distributed
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date/block), data = soil_vwc_24)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+#### Centers
+
+##### Overall
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop*year, center_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment*year, center_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop*year, center_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment*crop, center_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = center_vwc)
+dunnTest(vwc_percent~treatment, data = center_vwc)
+
+kruskal.test(vwc_percent~crop, data = center_vwc)
+dunnTest(vwc_percent~crop, data = center_vwc)
+
+kruskal.test(vwc_percent~year, data = center_vwc)
+
+kruskal.test(vwc_percent~year, data = subset(center_vwc, crop == "AS"))
+kruskal.test(vwc_percent~year, data = subset(center_vwc, crop == "DB"))
+kruskal.test(vwc_percent~year, data = subset(center_vwc, crop == "FC"))
+
+#LMM
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date), data = center_vwc)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ crop)
+
+```
+##### 2023
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop, center_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment, center_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop, center_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = center_vwc_23)
+dunnTest(vwc_percent~treatment, data = center_vwc_23)
+
+kruskal.test(vwc_percent~crop, data = center_vwc_23)
+dunnTest(vwc_percent~crop, data = center_vwc_23)
+
+kruskal.test(vwc_percent~treatment, data = subset(center_vwc_23, crop == "AS"))
+kruskal.test(vwc_percent~treatment, data = subset(center_vwc_23, crop == "DB"))
+kruskal.test(vwc_percent~treatment, data = subset(center_vwc_23, crop == "FC"))
+
+kruskal.test(vwc_percent~crop, data = subset(center_vwc_23, treatment == "BM"))
+dunnTest(vwc_percent~crop, data = subset(center_vwc_23, treatment == "BM"))
+
+kruskal.test(vwc_percent~crop, data = subset(center_vwc_23, treatment == "SM"))
+dunnTest(vwc_percent~crop, data = subset(center_vwc_23, treatment == "SM"))
+
+kruskal.test(vwc_percent~crop, data = subset(center_vwc_23, treatment == "CM"))
+dunnTest(vwc_percent~crop, data = subset(center_vwc_23, treatment == "CM"))
+
+#LMM
+model <- lmer(vwc_percent ~ crop + (1 | sample_date/block), data = center_vwc_23)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ crop)
+
+```
+##### 2024
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop, center_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment, center_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop, center_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = center_vwc_24)
+dunnTest(vwc_percent~treatment, data = center_vwc_24)
+
+kruskal.test(vwc_percent~crop, data = center_vwc_24)
+dunnTest(vwc_percent~crop, data = center_vwc_24)
+
+kruskal.test(vwc_percent~treatment, data = subset(center_vwc_24, crop == "AS"))
+dunnTest(vwc_percent~treatment, data = subset(center_vwc_24, crop == "AS"))
+
+kruskal.test(vwc_percent~treatment, data = subset(center_vwc_24, crop == "DB"))
+dunnTest(vwc_percent~treatment, data = subset(center_vwc_24, crop == "DB"))
+
+kruskal.test(vwc_percent~treatment, data = subset(center_vwc_24, crop == "FC"))
+dunnTest(vwc_percent~treatment, data = subset(center_vwc_24, crop == "FC"))
+
+#LMM: these really don't look normally distributed
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date), data = center_vwc_24)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+#### Edges
+
+##### Overall
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop*year, edge_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment*year, edge_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop*year, edge_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment*crop, edge_vwc)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = edge_vwc)
+dunnTest(vwc_percent~treatment, data = edge_vwc)
+
+kruskal.test(vwc_percent~crop, data = edge_vwc)
+dunnTest(vwc_percent~crop, data = edge_vwc)
+
+kruskal.test(vwc_percent~year, data = edge_vwc)
+
+kruskal.test(vwc_percent~year, data = subset(edge_vwc, treatment == "BM"))
+kruskal.test(vwc_percent~year, data = subset(edge_vwc, treatment == "SM"))
+kruskal.test(vwc_percent~year, data = subset(edge_vwc, treatment == "CM"))
+
+#LMM
+model <- lmer(vwc_percent ~ treatment + (1 | sample_date/block), data = edge_vwc)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+##### 2023
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop, edge_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment, edge_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop, edge_vwc_23)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = edge_vwc_23)
+dunnTest(vwc_percent~treatment, data = edge_vwc_23)
+
+kruskal.test(vwc_percent~crop, data = edge_vwc_23)
+dunnTest(vwc_percent~crop, data = edge_vwc_23)
+
+kruskal.test(vwc_percent~treatment, data = subset(edge_vwc_23, crop == "AS"))
+kruskal.test(vwc_percent~treatment, data = subset(edge_vwc_23, crop == "DB"))
+kruskal.test(vwc_percent~treatment, data = subset(edge_vwc_23, crop == "FC"))
+dunnTest(vwc_percent~treatment, data = subset(edge_vwc_23, crop == "FC"))
+
+kruskal.test(vwc_percent~crop, data = subset(edge_vwc_23, treatment == "BM"))
+dunnTest(vwc_percent~crop, data = subset(edge_vwc_23, treatment == "BM"))
+
+kruskal.test(vwc_percent~crop, data = subset(edge_vwc_23, treatment == "SM"))
+dunnTest(vwc_percent~crop, data = subset(edge_vwc_23, treatment == "SM"))
+
+kruskal.test(vwc_percent~crop, data = subset(edge_vwc_23, treatment == "CM"))
+dunnTest(vwc_percent~crop, data = subset(edge_vwc_23, treatment == "CM"))
+
+#LMM
+model <- lmer(vwc_percent ~ crop + (1 | sample_date/block), data = edge_vwc_23)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ crop)
+
+```
+##### 2024
+```{r}
+# There are treatment, crop, year, treatment*year, and crop*year interactions.
+model <- aov(vwc_percent ~ treatment*crop, edge_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ treatment, edge_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(vwc_percent ~ crop, edge_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+#KW
+kruskal.test(vwc_percent~treatment, data = edge_vwc_24)
+dunnTest(vwc_percent~treatment, data = edge_vwc_24)
+
+kruskal.test(vwc_percent~crop, data = edge_vwc_24)
+dunnTest(vwc_percent~crop, data = edge_vwc_24)
+
+kruskal.test(vwc_percent~treatment, data = subset(edge_vwc_24, crop == "AS"))
+dunnTest(vwc_percent~treatment, data = subset(edge_vwc_24, crop == "AS"))
+
+kruskal.test(vwc_percent~treatment, data = subset(edge_vwc_24, crop == "DB"))
+dunnTest(vwc_percent~treatment, data = subset(edge_vwc_24, crop == "DB"))
+
+kruskal.test(vwc_percent~treatment, data = subset(edge_vwc_24, crop == "FC"))
+dunnTest(vwc_percent~treatment, data = subset(edge_vwc_24, crop == "FC"))
+
+#LMM: these really don't look normally distributed
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date/block), data = edge_vwc_24)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ crop)
+
+```
+
+
+### Unclear what is happening here
+
+If I need to go forward with weekly analysis, then I would need to do Tukey HSD tests
+```{r}
+test <- soil_temp_day %>%
+        group_by(ID) %>%
+        summarize(count = n())
+
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "25")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "26")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "27")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "28")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "29")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "30")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "31")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "35")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "36")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "37")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "38")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2023" & week == "39")))
+
+```
+
+If I need to go forward with weekly analysis, then I would need to do Tukey HSD tests
+```{r}
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "27")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "28")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "29")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "30")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "32")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "33")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "34")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "35")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "36")))
+summary(aov(sqrt_vwc ~ treatment*crop, subset(soil_vwc, year == "2024" & week == "39")))
+
 ```
 
 

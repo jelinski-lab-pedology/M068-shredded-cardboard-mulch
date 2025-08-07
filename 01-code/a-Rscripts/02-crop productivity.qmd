@@ -108,7 +108,125 @@ yield_yr_FC <- subset(yield_yr, crop == "FC")
 yield_23_FC <- subset(yield_yr_FC, year == "2023")
 yield_24_FC <- subset(yield_yr_FC, year == "2024")
 ```
+#### Transformations
 
+##### Weekly yield
+Note that these ONLY achieve a normal distribution if weeks with 0g total yield for a plot are excluded
+```{r}
+#Strawberries 2023 marketable
+bc <- boxcox(lm((yield_wk_23_AS$marketable_g + 1) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_AS$bc_marketable <- ((yield_wk_23_AS$marketable_g + 1) ^ lambda -1)/lambda
+
+#Strawberries 2023 total
+bc <- boxcox(lm(yield_wk_23_AS$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_AS$bc_total <- (yield_wk_23_AS$total_g ^ lambda -1)/lambda
+
+#Strawberries 2024 total
+bc <- boxcox(lm(yield_wk_24_AS$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_AS$bc_total <- (yield_wk_24_AS$total_g ^ lambda -1)/lambda
+
+#Beans both years marketable
+bc <- boxcox(lm((yield_wk_DB$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_DB$bc_marketable <- ((yield_wk_DB$marketable_g) ^ lambda -1)/lambda
+
+#Beans 2023 marketable
+bc <- boxcox(lm((yield_wk_23_DB$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_DB$bc_marketable <- ((yield_wk_23_DB$marketable_g) ^ lambda -1)/lambda
+
+#Beans 2024 marketable
+bc <- boxcox(lm((yield_wk_24_DB$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_DB$bc_marketable <- ((yield_wk_24_DB$marketable_g) ^ lambda -1)/lambda
+
+#Beans both years total
+bc <- boxcox(lm((yield_wk_DB$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_DB$bc_total <- ((yield_wk_DB$total_g) ^ lambda -1)/lambda
+
+#Beans 2023 total
+bc <- boxcox(lm((yield_wk_23_DB$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_23_DB$bc_total <- ((yield_wk_23_DB$total_g) ^ lambda -1)/lambda
+
+#Beans 2024 total
+bc <- boxcox(lm((yield_wk_24_DB$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_DB$bc_total <- ((yield_wk_24_DB$total_g) ^ lambda -1)/lambda
+
+#Collards both years marketable
+bc <- boxcox(lm((yield_wk_FC$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_FC$bc_marketable <- ((yield_wk_FC$marketable_g) ^ lambda -1)/lambda
+
+#Collards 2024 marketable
+bc <- boxcox(lm((yield_wk_24_FC$marketable_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_FC$bc_marketable <- ((yield_wk_24_FC$marketable_g) ^ lambda -1)/lambda
+
+#Collards both years total
+bc <- boxcox(lm((yield_wk_FC$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_FC$bc_total <- ((yield_wk_FC$total_g) ^ lambda -1)/lambda
+
+#Collards 2024 total
+bc <- boxcox(lm((yield_wk_24_FC$total_g) ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_wk_24_FC$bc_total <- ((yield_wk_24_FC$total_g) ^ lambda -1)/lambda
+```
+
+##### Annual Yield
+```{r}
+#Strawberries both years marketable
+bc <- boxcox(lm(yield_yr_AS$marketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_yr_AS$bc_marketable <- (yield_yr_AS$marketable_g ^ lambda -1)/lambda
+
+#Strawberries both years unmarketable
+bc <- boxcox(lm(yield_yr_AS$unmarketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_yr_AS$bc_unmarketable <- (yield_yr_AS$unmarketable_g ^ lambda -1)/lambda
+
+#Strawberries 2024 unmarketable
+bc <- boxcox(lm(yield_24_AS$unmarketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_24_AS$bc_unmarket <- (yield_24_AS$unmarketable_g ^ lambda -1)/lambda
+
+#Beans 2024 marketable
+bc <- boxcox(lm(yield_24_DB$marketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_24_DB$bc_marketable <- (yield_24_DB$marketable_g ^ lambda -1)/lambda
+
+#Beans 2024 total
+bc <- boxcox(lm(yield_24_DB$total_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_24_DB$bc_total <- (yield_24_DB$total_g ^ lambda -1)/lambda
+
+#Collards 2023 marketable - boxcox, squared, and cubic because all achieve a normal distribution, and boxcox would be consistent with other transformations but cubic has the best distribution
+bc <- boxcox(lm(yield_23_FC$marketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_23_FC$bc_market <- (yield_23_FC$marketable_g ^ lambda -1)/lambda
+
+yield_23_FC$sq_market <- yield_23_FC$marketable_g^2
+
+yield_23_FC$cubic_market <- yield_23_FC$marketable_g^3
+
+#Collards both years unmarketables
+bc <- boxcox(lm(yield_yr_FC$unmarketable_g ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+yield_yr_FC$bc_unmarketable <- (yield_yr_FC$unmarketable_g ^ lambda -1)/lambda
+
+# Collards 2023 unmarketable
+yield_23_FC$cubic_unmarketable <- yield_23_FC$unmarketable_g^3
+
+# Collards 2023 total 
+yield_23_FC$cubic_total <- yield_23_FC$total_g^3
+
+```
 
 ### SPAD
 ```{r}
@@ -127,378 +245,6 @@ spad_AS <- subset(spad, crop == "AS")
 spad_DB <- subset(spad, crop == "DB")
 spad_FC <- subset(spad, crop == "FC")
 ```
-
-## Outlier checks
-
-### Weekly yield
-
-#### Strawberries
-
-##### Marketable
-
-There are six outliers, from weeks 34-36 in 2023, all above the upper bound. We had a really productive second harvest of strawberries--Nora was harvesting SO MANY--so while outside the normal range, I trust the data
-```{r}
-Q1 <- quantile(yield_wk_AS$marketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_AS$marketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_AS$marketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_AS, yield_wk_AS$marketable_g > upper_bound | 
-                    yield_wk_AS$marketable_g < lower_bound)
-```
-
-##### Percent marketable
-
-There are 25 potential outliers, all less than the lower bound (and most 0%). But, all were representative of real world conditions.
-
-```{r}
-Q1 <- quantile(yield_wk_AS$per_market, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_AS$per_market, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_AS$per_market,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_AS, yield_wk_AS$per_market > upper_bound | 
-                    yield_wk_AS$per_market < lower_bound)
-```
-
-##### Unmarketable
-
-There were 19 potential outliers, all higher than the upper bound. Most of the very high ones (like 5x the upper bound) were in 2023 during the second strawberry harvest. The rest were relatively close to the upper bound (only a couple grams higher)
-```{r}
-Q1 <- quantile(yield_wk_AS$unmarketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_AS$unmarketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_AS$unmarketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_AS, yield_wk_AS$unmarketable_g > upper_bound | 
-                    yield_wk_AS$unmarketable_g < lower_bound)
-```
-
-##### Total
-
-There were 5 potential outliers, several the same as marketable yield, for the large late-season harvest.
-```{r}
-Q1 <- quantile(yield_wk_AS$total_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_AS$total_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_AS$total_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_AS, yield_wk_AS$total_g > upper_bound | 
-                    yield_wk_AS$total_g < lower_bound)
-```
-
-#### Beans
-
-##### Marketable
-
-There were 8 potential outliers, all from the week we had just a truly overwhelming harvest in August (and we were harvesting heavily, as well, for a slew of upcoming neighborhood events)
-```{r}
-Q1 <- quantile(yield_wk_DB$marketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_DB$marketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_DB$marketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_DB, yield_wk_DB$marketable_g > upper_bound | 
-                    yield_wk_DB$marketable_g < lower_bound)
-```
-
-##### Percent marketable
-
-Three potential outliers, all just slightly less than 100% -- and they're find because while there were very few unmarketable beans, they did happen occassionally
-```{r}
-Q1 <- quantile(yield_wk_DB$per_market, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_DB$per_market, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_DB$per_market,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_DB, yield_wk_DB$per_market > upper_bound | 
-                    yield_wk_DB$per_market < lower_bound)
-```
-
-##### Unmarketable
-
-Same three outliers as identified above
-```{r}
-Q1 <- quantile(yield_wk_DB$unmarketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_DB$unmarketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_DB$unmarketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_DB, yield_wk_DB$unmarketable_g > upper_bound | 
-                    yield_wk_DB$unmarketable_g < lower_bound)
-```
-
-##### Total
-
-Eight potential outliers, the same as identified for marketable
-```{r}
-Q1 <- quantile(yield_wk_DB$total_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_DB$total_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_DB$total_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_DB, yield_wk_DB$total_g > upper_bound | 
-                    yield_wk_DB$total_g < lower_bound)
-```
-
-#### Collards
-
-##### Marketable
-
-There are 21 potential outliers, all from 2024. Half are close to the upper bound, and the other half are from the last days of harvest, after they hadn't been harvested for a month
-```{r}
-Q1 <- quantile(yield_wk_FC$marketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_FC$marketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_FC$marketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_FC, yield_wk_FC$marketable_g > upper_bound | 
-                    yield_wk_FC$marketable_g < lower_bound)
-```
-
-##### Percent marketable
-There are no outliers
-```{r}
-Q1 <- quantile(yield_wk_FC$per_market, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_FC$per_market, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_FC$per_market,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_FC, yield_wk_FC$per_market > upper_bound | 
-                    yield_wk_FC$per_market < lower_bound)
-```
-
-##### Unmarketable
-
-There are 20 potential outliers, all from 2024, but none of them give me any reason to think they're out of place
-```{r}
-Q1 <- quantile(yield_wk_FC$unmarketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_FC$unmarketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_FC$unmarketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_FC, yield_wk_FC$unmarketable_g > upper_bound | 
-                    yield_wk_FC$unmarketable_g < lower_bound)
-```
-
-##### Total
-22 rows, again, all from 2024
-```{r}
-Q1 <- quantile(yield_wk_FC$total_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_wk_FC$total_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_wk_FC$total_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_wk_FC, yield_wk_FC$total_g > upper_bound | 
-                    yield_wk_FC$total_g < lower_bound)
-```
-
-### Annual yield
-The outlier analysis for individual weeks is more important but doing it here for due diligence. 
-
-#### Strawberries
-
-##### Marketable
-There are no outliers
-```{r}
-Q1 <- quantile(yield_yr_AS$marketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_AS$marketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_AS$marketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_AS, yield_yr_AS$marketable_g > upper_bound | 
-                    yield_yr_AS$marketable_g < lower_bound)
-```
-
-##### Percent marketable
-
-Four potential outliers, all less than the lower_bound, but most are bare soil and seem to be due to low overall yields
-```{r}
-Q1 <- quantile(yield_yr_AS$per_market, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_AS$per_market, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_AS$per_market,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_AS, yield_yr_AS$per_market > upper_bound | 
-                    yield_yr_AS$per_market < lower_bound)
-```
-
-##### Unmarketable
-
-One potential outlier, but seems to just be a generally highly productive plot (and it isn't much higher than the upper bound)
-```{r}
-Q1 <- quantile(yield_yr_AS$unmarketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_AS$unmarketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_AS$unmarketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_AS, yield_yr_AS$unmarketable_g > upper_bound | 
-                    yield_yr_AS$unmarketable_g < lower_bound)
-```
-
-##### Total
-There are no outliers
-```{r}
-Q1 <- quantile(yield_yr_AS$total_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_AS$total_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_AS$total_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_AS, yield_yr_AS$total_g > upper_bound | 
-                    yield_yr_AS$total_g < lower_bound)
-```
-
-#### Beans
-
-##### Marketable
-There are no outliers
-```{r}
-Q1 <- quantile(yield_yr_DB$marketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_DB$marketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_FC$marketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_DB, yield_yr_DB$marketable_g > upper_bound | 
-                    yield_yr_DB$marketable_g < lower_bound)
-```
-
-##### Percent marketable
-
-Three potential outliers, all of which are just not 100%, which was the case for almost every plot
-```{r}
-Q1 <- quantile(yield_yr_DB$per_market, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_DB$per_market, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_DB$per_market,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_DB, yield_yr_DB$per_market > upper_bound | 
-                    yield_yr_DB$per_market < lower_bound)
-```
-
-##### Unmarketable
-Same three plots as above, not concerned
-```{r}
-Q1 <- quantile(yield_yr_DB$unmarketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_DB$unmarketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_DB$unmarketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_DB, yield_yr_DB$unmarketable_g > upper_bound | 
-                    yield_yr_DB$unmarketable_g < lower_bound)
-```
-
-##### Total
-There are no outliers
-```{r}
-Q1 <- quantile(yield_yr_DB$total_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_DB$total_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_DB$total_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_DB, yield_yr_DB$total_g > upper_bound | 
-                    yield_yr_DB$total_g < lower_bound)
-```
-
-#### Collards
-
-##### Marketable
-
-One potential outlier, in 2024, and I can tell you from memory that it was the plot with all the ridiculously large collard plants
-```{r}
-Q1 <- quantile(yield_yr_FC$marketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_FC$marketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_FC$marketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_FC, yield_yr_FC$marketable_g > upper_bound | 
-                    yield_yr_FC$marketable_g < lower_bound)
-```
-
-##### Percent marketable
-There are no outliers
-```{r}
-Q1 <- quantile(yield_yr_FC$per_market, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_FC$per_market, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_FC$per_market,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_FC, yield_yr_FC$per_market > upper_bound | 
-                    yield_yr_FC$per_market < lower_bound)
-```
-
-##### Unmarketable
-There are no outliers
-```{r}
-Q1 <- quantile(yield_yr_FC$unmarketable_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_FC$unmarketable_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_FC$unmarketable_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_FC, yield_yr_FC$unmarketable_g > upper_bound | 
-                    yield_yr_FC$unmarketable_g < lower_bound)
-```
-
-##### Total
-There are no outliers
-```{r}
-Q1 <- quantile(yield_yr_FC$total_g, 0.25, na.rm = TRUE) 
-Q3 <- quantile(yield_yr_FC$total_g, 0.75, na.rm = TRUE) 
-IQR <- IQR(yield_yr_FC$total_g,na.rm = TRUE)
-
-lower_bound <- Q1 - (1.5*IQR)
-upper_bound <- Q3 + (1.5*IQR)
-
-subset(yield_yr_FC, yield_yr_FC$total_g > upper_bound | 
-                    yield_yr_FC$total_g < lower_bound)
-```
-
-### SPAD
 
 #### Strawberries
 
@@ -519,6 +265,15 @@ spad_AS_out <- spad_AS
 #outliers removed
 spad_AS <- spad_AS %>%
            subset(value > lower_bound & value < upper_bound)
+
+#Transformation for Strawberries 2023 
+bc <- boxcox(lm(spad_23_AS$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_AS$bc_value <- (spad_23_AS$value ^ lambda -1)/lambda
+
+bc <- boxcox(lm(spad_23_AS_out$value ~ 1))
+lambda <- bc$x[which.max(bc$y)]
+spad_23_AS_out$bc_value <- (spad_23_AS_out$value ^ lambda -1)/lambda
 
 ```
 
@@ -565,1976 +320,6 @@ spad_FC <- spad_FC %>%
 
 ```
 
-## Normality and Transformations
-
-### Weekly yield
-
-#### Strawberries
-
-##### Marketable yield
-
-The original dataset is non-parametric, with a lambda between 0 and 0.5 which indicates a log, sqrt, or boxcox transformation will be most appropriate. None achieves a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_AS$marketable_g)
-skewness(yield_wk_AS$marketable_g, na.rm = TRUE)
-qqnorm(yield_wk_AS$marketable_g, main='Normal')
-qqline(yield_wk_AS$marketable_g)
-shapiro.test(yield_wk_AS$marketable_g)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_AS$marketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_AS$bc_marketable <- ((yield_wk_AS$marketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_AS$bc_marketable)
-skewness(yield_wk_AS$bc_marketable, na.rm = TRUE)
-qqnorm(yield_wk_AS$bc_marketable, main='Normal')
-qqline(yield_wk_AS$bc_marketable)
-shapiro.test(yield_wk_AS$bc_marketable)
-
-#log
-yield_wk_AS$log_marketable <- log10(yield_wk_AS$marketable_g + 1)
-
-hist(yield_wk_AS$log_marketable)
-skewness(yield_wk_AS$log_marketable, na.rm = TRUE)
-qqnorm(yield_wk_AS$log_marketable, main='Normal')
-qqline(yield_wk_AS$log_marketable)
-shapiro.test(yield_wk_AS$log_marketable)
-
-#sqrt
-yield_wk_AS$sqrt_marketable <- sqrt(yield_wk_AS$marketable_g + 1)
-
-hist(yield_wk_AS$sqrt_marketable)
-skewness(yield_wk_AS$sqrt_marketable, na.rm = TRUE)
-qqnorm(yield_wk_AS$sqrt_marketable, main='Normal')
-qqline(yield_wk_AS$sqrt_marketable)
-shapiro.test(yield_wk_AS$sqrt_marketable)
-```
-
-2023 only: The original dataset is non-parametric, with a lambda between 0 and 0.5 which indicates a log, sqrt, or boxcox transformation will be most appropriate. The boxcox is the only one that achieves a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_23_AS$marketable_g)
-skewness(yield_wk_23_AS$marketable_g, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$marketable_g, main='Normal')
-qqline(yield_wk_23_AS$marketable_g)
-shapiro.test(yield_wk_23_AS$marketable_g)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_23_AS$marketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_23_AS$bc_marketable <- ((yield_wk_23_AS$marketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_23_AS$bc_marketable)
-skewness(yield_wk_23_AS$bc_marketable, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$bc_marketable, main='Normal')
-qqline(yield_wk_23_AS$bc_marketable)
-shapiro.test(yield_wk_23_AS$bc_marketable)
-
-#log
-#yield_wk_23_AS$log_marketable <- log10(yield_wk_23_AS$marketable_g + 1)
-#shapiro.test(yield_wk_23_AS$log_marketable)
-
-#sqrt
-#yield_wk_23_AS$sqrt_marketable <- sqrt(yield_wk_23_AS$marketable_g + 1)
-#shapiro.test(yield_wk_23_AS$sqrt_marketable)
-```
-
-2024 only: The original dataset is non-parametric with a lambda close to 0, indicating a boxcox or log transformation will be most appropriate. Neither achieves a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_24_AS$marketable_g)
-skewness(yield_wk_24_AS$marketable_g, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$marketable_g, main='Normal')
-qqline(yield_wk_24_AS$marketable_g)
-shapiro.test(yield_wk_24_AS$marketable_g)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_24_AS$marketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_24_AS$bc_marketable <- ((yield_wk_24_AS$marketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_24_AS$bc_marketable)
-skewness(yield_wk_24_AS$bc_marketable, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$bc_marketable, main='Normal')
-qqline(yield_wk_24_AS$bc_marketable)
-shapiro.test(yield_wk_24_AS$bc_marketable)
-
-#log
-yield_wk_24_AS$log_marketable <- log10(yield_wk_24_AS$marketable_g + 1)
-
-hist(yield_wk_24_AS$log_marketable)
-skewness(yield_wk_24_AS$log_marketable, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$log_marketable, main='Normal')
-qqline(yield_wk_24_AS$log_marketable)
-shapiro.test(yield_wk_24_AS$log_marketable)
-
-```
-
-##### Percent Marketable
-
-The original dataset is non-parametric, with a lambda between 1 and 2, indicating that a squared, cubic, or boxcox transformation would be most appropriate. None of them achieve a normal distribution, though
-```{r}
-#original dataset
-hist(yield_wk_AS$per_market)
-skewness(yield_wk_AS$per_market, na.rm = TRUE)
-qqnorm(yield_wk_AS$per_market, main='Normal')
-qqline(yield_wk_AS$per_market)
-shapiro.test(yield_wk_AS$per_market)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_AS$per_market + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_AS$bc_per <- ((yield_wk_AS$per_market + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_AS$bc_per)
-skewness(yield_wk_AS$bc_per, na.rm = TRUE)
-qqnorm(yield_wk_AS$bc_per, main='Normal')
-qqline(yield_wk_AS$bc_per)
-shapiro.test(yield_wk_AS$bc_per)
-
-#squared
-yield_wk_AS$sq_per <- (yield_wk_AS$per_market)^2
-
-hist(yield_wk_AS$sq_per)
-skewness(yield_wk_AS$sq_per, na.rm = TRUE)
-qqnorm(yield_wk_AS$sq_per, main='Normal')
-qqline(yield_wk_AS$sq_per)
-shapiro.test(yield_wk_AS$sq_per)
-
-#sqrt
-yield_wk_AS$cubic_per <- yield_wk_AS$per_market^3
-
-hist(yield_wk_AS$cubic_per)
-skewness(yield_wk_AS$cubic_per, na.rm = TRUE)
-qqnorm(yield_wk_AS$cubic_per, main='Normal')
-qqline(yield_wk_AS$cubic_per)
-shapiro.test(yield_wk_AS$cubic_per)
-```
-2023 only: The original dataset is non-parametric with a lambda of 2, indicating that a squared, cubic, or boxcox transformation would be most appropriate. None achieve a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_23_AS$per_market)
-skewness(yield_wk_23_AS$per_market, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$per_market, main='Normal')
-qqline(yield_wk_23_AS$per_market)
-shapiro.test(yield_wk_23_AS$per_market)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_23_AS$per_market + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_23_AS$bc_per <- ((yield_wk_23_AS$per_market + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_23_AS$bc_per)
-skewness(yield_wk_23_AS$bc_per, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$bc_per, main='Normal')
-qqline(yield_wk_23_AS$bc_per)
-shapiro.test(yield_wk_23_AS$bc_per)
-
-#squared
-yield_wk_23_AS$sq_per <- (yield_wk_23_AS$per_market)^2
-
-hist(yield_wk_23_AS$sq_per)
-skewness(yield_wk_23_AS$sq_per, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$sq_per, main='Normal')
-qqline(yield_wk_23_AS$sq_per)
-shapiro.test(yield_wk_23_AS$sq_per)
-
-#cubic
-yield_wk_23_AS$cubic_per <- yield_wk_23_AS$per_market^3
-
-hist(yield_wk_23_AS$cubic_per)
-skewness(yield_wk_23_AS$cubic_per, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$cubic_per, main='Normal')
-qqline(yield_wk_23_AS$cubic_per)
-shapiro.test(yield_wk_23_AS$cubic_per)
-```
-
-2024 only: The original dataset is non-parametric, with a lambda between 0.5 and 1 indicating that a sqrt or boxcox transformation would be most appropriate. Neither achieves a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_24_AS$per_market)
-skewness(yield_wk_24_AS$per_market, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$per_market, main='Normal')
-qqline(yield_wk_24_AS$per_market)
-shapiro.test(yield_wk_24_AS$per_market)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_24_AS$per_market + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_24_AS$bc_per <- ((yield_wk_24_AS$per_market + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_24_AS$bc_per)
-skewness(yield_wk_24_AS$bc_per, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$bc_per, main='Normal')
-qqline(yield_wk_24_AS$bc_per)
-shapiro.test(yield_wk_24_AS$bc_per)
-
-#sqrt
-yield_wk_AS$sqrt_per <- sqrt(yield_wk_AS$per_market)
-
-hist(yield_wk_AS$sqrt_per)
-skewness(yield_wk_AS$sqrt_per, na.rm = TRUE)
-qqnorm(yield_wk_AS$sqrt_per, main='Normal')
-qqline(yield_wk_AS$sqrt_per)
-shapiro.test(yield_wk_AS$sqrt_per)
-
-```
-
-##### Unmarketable yield
-
-The original dataset is non-parametric, with a lambda between -0.5 and 0 indicating an inverse sqrt, log, or boxcox would be most appropriate. None results in a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_AS$unmarketable_g)
-skewness(yield_wk_AS$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_wk_AS$unmarketable_g, main='Normal')
-qqline(yield_wk_AS$unmarketable_g)
-shapiro.test(yield_wk_AS$unmarketable_g)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_AS$unmarketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_AS$bc_unmarketable <- ((yield_wk_AS$unmarketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_AS$bc_unmarketable)
-skewness(yield_wk_AS$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_AS$bc_unmarketable, main='Normal')
-qqline(yield_wk_AS$bc_unmarketable)
-shapiro.test(yield_wk_AS$bc_unmarketable)
-
-#log
-yield_wk_AS$log_unmarketable <- log10(yield_wk_AS$unmarketable_g + 1)
-
-hist(yield_wk_AS$log_unmarketable)
-skewness(yield_wk_AS$log_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_AS$log_unmarketable, main='Normal')
-qqline(yield_wk_AS$log_unmarketable)
-shapiro.test(yield_wk_AS$log_unmarketable)
-
-#inverse sqrt
-yield_wk_AS$in_sqrt_unmarketable <- 1/sqrt(yield_wk_AS$unmarketable_g + 1)
-
-hist(yield_wk_AS$in_sqrt_unmarketable)
-skewness(yield_wk_AS$in_sqrt_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_AS$in_sqrt_unmarketable, main='Normal')
-qqline(yield_wk_AS$in_sqrt_unmarketable)
-shapiro.test(yield_wk_AS$in_sqrt_unmarketable)
-```
-
-2023 only: The original dataset is non-parametric, with a lambda between -0.5 and 0 indicating an inverse sqrt, log, or boxcox would be most appropriate. None results in a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_23_AS$unmarketable_g)
-skewness(yield_wk_23_AS$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$unmarketable_g, main='Normal')
-qqline(yield_wk_23_AS$unmarketable_g)
-shapiro.test(yield_wk_23_AS$unmarketable_g)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_23_AS$unmarketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_23_AS$bc_unmarketable <- ((yield_wk_23_AS$unmarketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_23_AS$bc_unmarketable)
-skewness(yield_wk_23_AS$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$bc_unmarketable, main='Normal')
-qqline(yield_wk_23_AS$bc_unmarketable)
-shapiro.test(yield_wk_23_AS$bc_unmarketable)
-
-#log
-yield_wk_23_AS$log_unmarketable <- log10(yield_wk_23_AS$unmarketable_g + 1)
-
-hist(yield_wk_23_AS$log_unmarketable)
-skewness(yield_wk_23_AS$log_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$log_unmarketable, main='Normal')
-qqline(yield_wk_23_AS$log_unmarketable)
-shapiro.test(yield_wk_23_AS$log_unmarketable)
-
-#inverse sqrt
-yield_wk_23_AS$in_sqrt_unmarketable <- 1/sqrt(yield_wk_23_AS$unmarketable_g + 1)
-
-hist(yield_wk_23_AS$in_sqrt_unmarketable)
-skewness(yield_wk_23_AS$in_sqrt_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$in_sqrt_unmarketable, main='Normal')
-qqline(yield_wk_23_AS$in_sqrt_unmarketable)
-shapiro.test(yield_wk_23_AS$in_sqrt_unmarketable)
-```
-
-2024 only:The original dataset is non-parametric, with a lambda between -0.5 and 0 indicating an inverse sqrt, log, or boxcox would be most appropriate. None results in a normal distribution
-```{r}
-#original dataset
-hist(yield_wk_24_AS$unmarketable_g)
-skewness(yield_wk_24_AS$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$unmarketable_g, main='Normal')
-qqline(yield_wk_24_AS$unmarketable_g)
-shapiro.test(yield_wk_24_AS$unmarketable_g)
-
-#boxcox
-bc <- boxcox(lm((yield_wk_24_AS$unmarketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_24_AS$bc_unmarketable <- ((yield_wk_24_AS$unmarketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_wk_24_AS$bc_unmarketable)
-skewness(yield_wk_24_AS$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$bc_unmarketable, main='Normal')
-qqline(yield_wk_24_AS$bc_unmarketable)
-shapiro.test(yield_wk_24_AS$bc_unmarketable)
-
-#log
-yield_wk_24_AS$log_unmarketable <- log10(yield_wk_24_AS$unmarketable_g + 1)
-
-hist(yield_wk_24_AS$log_unmarketable)
-skewness(yield_wk_24_AS$log_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$log_unmarketable, main='Normal')
-qqline(yield_wk_24_AS$log_unmarketable)
-shapiro.test(yield_wk_24_AS$log_unmarketable)
-
-#inverse sqrt
-yield_wk_24_AS$in_sqrt_unmarketable <- 1/sqrt(yield_wk_24_AS$unmarketable_g + 1)
-
-hist(yield_wk_24_AS$in_sqrt_unmarketable)
-skewness(yield_wk_24_AS$in_sqrt_unmarketable, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$in_sqrt_unmarketable, main='Normal')
-qqline(yield_wk_24_AS$in_sqrt_unmarketable)
-shapiro.test(yield_wk_24_AS$in_sqrt_unmarketable)
-```
-
-##### Total yield
-Closest to a normal distribution, still not quite there
-```{r}
-hist(yield_AS$total_g)
-skewness(yield_AS$total_g, na.rm = TRUE)
-qqnorm(yield_AS$total_g, main='Normal')
-qqline(yield_AS$total_g)
-shapiro.test(yield_AS$total_g)
-
-```
-
-```{r}
-bc <- boxcox(lm(yield_AS$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_AS$bc_total <- (yield_AS$total_g ^ lambda -1)/lambda
-
-hist(yield_AS$bc_total)
-skewness(yield_AS$bc_total, na.rm = TRUE)
-qqnorm(yield_AS$bc_total, main='Normal')
-qqline(yield_AS$bc_total)
-shapiro.test(yield_AS$bc_total)
-
-```
-
-Overall: The dataset is non-parametric, with a lambda between 0 and 0.5 indicating that a log, sqrt, or boxcox transformation would be most appropriate. None of them are successfull though
-```{r}
-#original dataset
-hist(yield_wk_AS$total_g)
-skewness(yield_wk_AS$total_g, na.rm = TRUE)
-qqnorm(yield_wk_AS$total_g, main='Normal')
-qqline(yield_wk_AS$total_g)
-shapiro.test(yield_wk_AS$total_g)
-
-#boxcox
-bc <- boxcox(lm(yield_wk_AS$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_AS$bc_total <- (yield_wk_AS$total_g ^ lambda -1)/lambda
-
-hist(yield_wk_AS$bc_total)
-skewness(yield_wk_AS$bc_total, na.rm = TRUE)
-qqnorm(yield_wk_AS$bc_total, main='Normal')
-qqline(yield_wk_AS$bc_total)
-shapiro.test(yield_wk_AS$bc_total)
-
-#log
-yield_wk_AS$log_total <- log10(yield_wk_AS$total_g)
-
-hist(yield_wk_AS$log_total)
-skewness(yield_wk_AS$log_total, na.rm = TRUE)
-qqnorm(yield_wk_AS$log_total, main='Normal')
-qqline(yield_wk_AS$log_total)
-shapiro.test(yield_wk_AS$log_total)
-
-#sqrt
-yield_wk_AS$sqrt_total <- sqrt(yield_wk_AS$total_g)
-
-hist(yield_wk_AS$sqrt_total)
-skewness(yield_wk_AS$sqrt_total, na.rm = TRUE)
-qqnorm(yield_wk_AS$sqrt_total, main='Normal')
-qqline(yield_wk_AS$sqrt_total)
-shapiro.test(yield_wk_AS$sqrt_total)
-```
-
-2023 only: The dataset is non-parametric, with a lambda between 0 and 0.5 indicating that a log, sqrt, or boxcox transformation would be most appropriate. The box cox manages it!
-```{r}
-#original dataset
-hist(yield_wk_23_AS$total_g)
-skewness(yield_wk_23_AS$total_g, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$total_g, main='Normal')
-qqline(yield_wk_23_AS$total_g)
-shapiro.test(yield_wk_23_AS$total_g)
-
-#boxcox
-bc <- boxcox(lm(yield_wk_23_AS$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_23_AS$bc_total <- (yield_wk_23_AS$total_g ^ lambda -1)/lambda
-
-hist(yield_wk_23_AS$bc_total)
-skewness(yield_wk_23_AS$bc_total, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$bc_total, main='Normal')
-qqline(yield_wk_23_AS$bc_total)
-shapiro.test(yield_wk_23_AS$bc_total)
-
-#log
-yield_wk_23_AS$log_total <- log10(yield_wk_23_AS$total_g)
-
-hist(yield_wk_23_AS$log_total)
-skewness(yield_wk_23_AS$log_total, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$log_total, main='Normal')
-qqline(yield_wk_23_AS$log_total)
-shapiro.test(yield_wk_23_AS$log_total)
-
-#sqrt
-yield_wk_23_AS$sqrt_total <- sqrt(yield_wk_23_AS$total_g)
-
-hist(yield_wk_23_AS$sqrt_total)
-skewness(yield_wk_23_AS$sqrt_total, na.rm = TRUE)
-qqnorm(yield_wk_23_AS$sqrt_total, main='Normal')
-qqline(yield_wk_23_AS$sqrt_total)
-shapiro.test(yield_wk_23_AS$sqrt_total)
-```
-
-2024 only: The dataset is non-parametric, with a lambda between 0 and 0.5 indicating that a log, sqrt, or boxcox transformation would be most appropriate. The box cox manages it!
-```{r}
-#original dataset
-hist(yield_wk_24_AS$total_g)
-skewness(yield_wk_24_AS$total_g, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$total_g, main='Normal')
-qqline(yield_wk_24_AS$total_g)
-shapiro.test(yield_wk_24_AS$total_g)
-
-#boxcox
-bc <- boxcox(lm(yield_wk_24_AS$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_wk_24_AS$bc_total <- (yield_wk_24_AS$total_g ^ lambda -1)/lambda
-
-hist(yield_wk_24_AS$bc_total)
-skewness(yield_wk_24_AS$bc_total, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$bc_total, main='Normal')
-qqline(yield_wk_24_AS$bc_total)
-shapiro.test(yield_wk_24_AS$bc_total)
-
-#log
-yield_wk_24_AS$log_total <- log10(yield_wk_24_AS$total_g)
-
-hist(yield_wk_24_AS$log_total)
-skewness(yield_wk_24_AS$log_total, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$log_total, main='Normal')
-qqline(yield_wk_24_AS$log_total)
-shapiro.test(yield_wk_24_AS$log_total)
-
-#sqrt
-yield_wk_24_AS$sqrt_total <- sqrt(yield_wk_24_AS$total_g)
-
-hist(yield_wk_24_AS$sqrt_total)
-skewness(yield_wk_24_AS$sqrt_total, na.rm = TRUE)
-qqnorm(yield_wk_24_AS$sqrt_total, main='Normal')
-qqline(yield_wk_24_AS$sqrt_total)
-shapiro.test(yield_wk_24_AS$sqrt_total)
-```
-
-#### Beans
-
-##### Marketable yield
-Normally distributed!
-```{r}
-
-#original dataset
-hist(yield_DB$marketable_g)
-skewness(yield_DB$marketable_g, na.rm = TRUE)
-qqnorm(yield_DB$marketable_g, main='Normal')
-qqline(yield_DB$marketable_g)
-shapiro.test(yield_DB$marketable_g)
-
-bc <- boxcox(lm(yield_DB$marketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_DB$bc_marketable <- (yield_DB$marketable_g ^ lambda -1)/lambda
-
-hist(yield_DB$bc_marketable)
-skewness(yield_DB$bc_marketable, na.rm = TRUE)
-qqnorm(yield_DB$bc_marketable, main='Normal')
-qqline(yield_DB$bc_marketable)
-shapiro.test(yield_DB$bc_marketable)
-
-```
-##### Unmarketable yield
-Not sure how to achieve a normal distribution - not even sure I need to, honestly
-```{r}
-hist(yield_DB$unmarketable_g)
-skewness(yield_DB$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_DB$unmarketable_g, main='Normal')
-qqline(yield_DB$unmarketable_g)
-shapiro.test(yield_DB$unmarketable_g)
-
-```
-
-```{r}
-bc <- boxcox(lm((yield_DB$unmarketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_DB$bc_unmarketable <- ((yield_DB$unmarketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_DB$bc_unmarketable)
-skewness(yield_DB$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_DB$bc_unmarketable, main='Normal')
-qqline(yield_DB$bc_unmarketable)
-shapiro.test(yield_DB$bc_unmarketable)
-
-```
-
-##### Total yield
-Normal distribution achieved!
-```{r}
-hist(yield_DB$total_g)
-skewness(yield_DB$total_g, na.rm = TRUE)
-qqnorm(yield_DB$total_g, main='Normal')
-qqline(yield_DB$total_g)
-shapiro.test(yield_DB$total_g)
-
-```
-
-```{r}
-bc <- boxcox(lm(yield_DB$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_DB$bc_total <- (yield_DB$total_g ^ lambda -1)/lambda
-
-hist(yield_DB$bc_total)
-skewness(yield_DB$bc_total, na.rm = TRUE)
-qqnorm(yield_DB$bc_total, main='Normal')
-qqline(yield_DB$bc_total)
-shapiro.test(yield_DB$bc_total)
-
-```
-
-#### Collards
-
-##### Marketable yield
-Not sure how to achieve a normal distribution
-```{r}
-hist(yield_FC$marketable_g)
-skewness(yield_FC$marketable_g, na.rm = TRUE)
-qqnorm(yield_FC$marketable_g, main='Normal')
-qqline(yield_FC$marketable_g)
-shapiro.test(yield_FC$marketable_g)
-
-```
-
-```{r}
-bc <- boxcox(lm((yield_FC$marketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_FC$bc_marketable <- ((yield_FC$marketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_FC$bc_marketable)
-skewness(yield_FC$bc_marketable, na.rm = TRUE)
-qqnorm(yield_FC$bc_marketable, main='Normal')
-qqline(yield_FC$bc_marketable)
-shapiro.test(yield_FC$bc_marketable)
-
-```
-##### Unmarketable yield
-Not sure how to achieve a normal distribution
-```{r}
-hist(yield_FC$unmarketable_g)
-skewness(yield_FC$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_FC$unmarketable_g, main='Normal')
-qqline(yield_FC$unmarketable_g)
-shapiro.test(yield_FC$unmarketable_g)
-
-```
-
-```{r}
-bc <- boxcox(lm((yield_FC$unmarketable_g + 1) ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_FC$bc_unmarketable <- ((yield_FC$unmarketable_g + 1) ^ lambda -1)/lambda
-
-hist(yield_FC$bc_unmarketable)
-skewness(yield_FC$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_FC$bc_unmarketable, main='Normal')
-qqline(yield_FC$bc_unmarketable)
-shapiro.test(yield_FC$bc_unmarketable)
-
-```
-
-##### Total yield
-Closest to a normal distribution, still not quite there
-```{r}
-hist(yield_FC$total_g)
-skewness(yield_FC$total_g, na.rm = TRUE)
-qqnorm(yield_FC$total_g, main='Normal')
-qqline(yield_FC$total_g)
-shapiro.test(yield_FC$total_g)
-
-```
-
-```{r}
-bc <- boxcox(lm(yield_FC$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_FC$bc_total <- (yield_FC$total_g ^ lambda -1)/lambda
-
-hist(yield_FC$bc_total)
-skewness(yield_FC$bc_total, na.rm = TRUE)
-qqnorm(yield_FC$bc_total, main='Normal')
-qqline(yield_FC$bc_total)
-shapiro.test(yield_FC$bc_total)
-
-```
-
-### Annual yield
-
-#### Strawberries
-
-##### Marketable yield
-
-The original dataset is non-parametric. Boxcox function shows that lambda is between 0 and 0.5, indicating that log, sqrt, or boxcox transformations would be appropriate. Boxcox is the only one that achieves a normal distribution (p = 0.05), just barely.
-
-```{r}
-# original dataset
-hist(yield_yr_AS$marketable_g)
-skewness(yield_yr_AS$marketable_g, na.rm = TRUE)
-qqnorm(yield_yr_AS$marketable_g, main='Normal')
-qqline(yield_yr_AS$marketable_g)
-shapiro.test(yield_yr_AS$marketable_g)
-
-#boxcox transformation
-bc <- boxcox(lm(yield_yr_AS$marketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_yr_AS$bc_marketable <- (yield_yr_AS$marketable_g ^ lambda -1)/lambda
-
-hist(yield_yr_AS$bc_marketable)
-skewness(yield_yr_AS$bc_marketable, na.rm = TRUE)
-qqnorm(yield_yr_AS$bc_marketable, main='Normal')
-qqline(yield_yr_AS$bc_marketable)
-shapiro.test(yield_yr_AS$bc_marketable)
-
-# log transformation
-# yield_yr_AS$log_marketable <- log10(yield_yr_AS$marketable_g)
-# shapiro.test(yield_yr_AS$log_marketable)
-
-# sqrt transformation
-# yield_yr_AS$sqrt_marketable <- sqrt(yield_yr_AS$marketable_g)
-#shapiro.test(yield_yr_AS$sqrt_marketable)
-
-```
-2023 only: normal distribution
-
-```{r}
-# original dataset
-hist(yield_23_AS$marketable_g)
-skewness(yield_23_AS$marketable_g, na.rm = TRUE)
-qqnorm(yield_23_AS$marketable_g, main='Normal')
-qqline(yield_23_AS$marketable_g)
-shapiro.test(yield_23_AS$marketable_g)
-
-```
-2024 only: normal distribution
-
-```{r}
-# original dataset
-hist(yield_24_AS$marketable_g)
-skewness(yield_24_AS$marketable_g, na.rm = TRUE)
-qqnorm(yield_24_AS$marketable_g, main='Normal')
-qqline(yield_24_AS$marketable_g)
-shapiro.test(yield_24_AS$marketable_g)
-
-```
-
-##### Percent marketable
-
-The original dataset is non-parametric. The lambda is over 2, indicating the boxcox or square transformation will likely be best; I'll also try cubic. However, no transformation strategy successfully achieves a normal distribution; the squared is closest.
-
-```{r}
-# original dataset
-hist(yield_yr_AS$per_market)
-skewness(yield_yr_AS$per_market, na.rm = TRUE)
-qqnorm(yield_yr_AS$per_market, main='Normal')
-qqline(yield_yr_AS$per_market)
-shapiro.test(yield_yr_AS$per_market)
-
-#boxcox transformation
-#bc <- boxcox(lm(yield_yr_AS$per_market ~ 1))
-#lambda <- bc$x[which.max(bc$y)]
-#yield_yr_AS$bc_per <- (yield_yr_AS$per_market ^ lambda -1)/lambda
-#shapiro.test(yield_yr_AS$bc_per)
-
-# squared transformation
-# yield_yr_AS$sq_marketable <- (yield_yr_AS$marketable_g)^2
-# shapiro.test(yield_yr_AS$sq_marketable)
-
-# cubic transformation
-# yield_yr_AS$cube_marketable <- (yield_yr_AS$marketable_g)^3
-# shapiro.test(yield_yr_AS$cube_marketable)
-
-```
-2023 only: normal distribution
-
-```{r}
-# original dataset
-
-hist(yield_23_AS$per_market)
-skewness(yield_23_AS$per_market, na.rm = TRUE)
-qqnorm(yield_23_AS$per_market, main='Normal')
-qqline(yield_23_AS$per_market)
-shapiro.test(yield_23_AS$per_market)
-
-```
-2024 only: The original dataset is non-parametric. The lambda is about 2, indiciating that boxcox or squared or cubic will be the best transformation strategy. None achieve a normal distribution, but the cubic is best (p = 0.03). Boxcox isn't far behind, for consistency (p = 0.02). BUT, I tried an ANOVA with the cubic transformation, and model assumptions were not met
-
-```{r}
-# original dataset
-hist(yield_24_AS$per_market)
-skewness(yield_24_AS$per_market, na.rm = TRUE)
-qqnorm(yield_24_AS$per_market, main='Normal')
-qqline(yield_24_AS$per_market)
-shapiro.test(yield_24_AS$per_market)
-
-#boxcox transformation
-# bc <- boxcox(lm(yield_24_AS$per_market ~ 1))
-# lambda <- bc$x[which.max(bc$y)]
-# yield_24_AS$bc_per <- (yield_24_AS$per_market ^ lambda -1)/lambda
-# shapiro.test(yield_24_AS$bc_per)
-
-#squared
-# yield_24_AS$sq_per <- (yield_24_AS$per_market)^2
-# shapiro.test(yield_24_AS$sq_per)
-
-#cubic
-# yield_24_AS$cubic_per <- (yield_24_AS$per_market)^3
-# shapiro.test(yield_24_AS$cubic_per)
-```
-
-##### Unmarketable yield
-
-The original dataset is not normally distributed. Lambda is close to 0, indicating that box cox or log would be best transformations. Both have a similar quality and achieve a normal distribution
-```{r}
-#original dataset
-hist(yield_yr_AS$unmarketable_g)
-skewness(yield_yr_AS$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_yr_AS$unmarketable_g, main='Normal')
-qqline(yield_yr_AS$unmarketable_g)
-shapiro.test(yield_yr_AS$unmarketable_g)
-
-#boxcox
-bc <- boxcox(lm(yield_yr_AS$unmarketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_yr_AS$bc_unmarketable <- (yield_yr_AS$unmarketable_g ^ lambda -1)/lambda
-
-hist(yield_yr_AS$bc_unmarketable)
-skewness(yield_yr_AS$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_yr_AS$bc_unmarketable, main='Normal')
-qqline(yield_yr_AS$bc_unmarketable)
-shapiro.test(yield_yr_AS$bc_unmarketable)
-
-#log
-#yield_yr_AS$log_market <- log10(yield_yr_AS$unmarketable_g)
-#shapiro.test(yield_yr_AS$log_market)
-
-```
-
-2023 only: normal distribution
-
-```{r}
-# original dataset
-hist(yield_23_AS$unmarketable_g)
-skewness(yield_23_AS$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_23_AS$unmarketable_g, main='Normal')
-qqline(yield_23_AS$unmarketable_g)
-shapiro.test(yield_23_AS$unmarketable_g)
-
-```
-2024 only: Original dataset isn't quite normally distributed (p = 0.04). Lambda is close to 0, indicating that log or inverse square root would be best. Because I don't think I'm going to actually analyze this dataset, I just did boxcox, which achieved a normal distribution
-
-```{r}
-# original dataset
-hist(yield_24_AS$unmarketable_g)
-skewness(yield_24_AS$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_24_AS$unmarketable_g, main='Normal')
-qqline(yield_24_AS$unmarketable_g)
-shapiro.test(yield_24_AS$unmarketable_g)
-
-# boxcox
-bc <- boxcox(lm(yield_24_AS$unmarketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_24_AS$bc_unmarket <- (yield_24_AS$unmarketable_g ^ lambda -1)/lambda
-
-hist(yield_24_AS$bc_unmarket)
-skewness(yield_24_AS$bc_unmarket, na.rm = TRUE)
-qqnorm(yield_24_AS$bc_unmarket, main='Normal')
-qqline(yield_24_AS$bc_unmarket)
-shapiro.test(yield_24_AS$bc_unmarket)
-```
-
-##### Total yield
-
-The original dataset is non-parametric. Boxcox function found that the lambda is close to 0, indicating that a log or boxcox transformation would be most appropriate. However, neither achieves a normal distribution (p = 0.01 for both)
-```{r}
-#original data set
-hist(yield_yr_AS$total_g)
-skewness(yield_yr_AS$total_g, na.rm = TRUE)
-qqnorm(yield_yr_AS$total_g, main='Normal')
-qqline(yield_yr_AS$total_g)
-shapiro.test(yield_yr_AS$total_g)
-
-# boxcox
-#bc <- boxcox(lm(yield_yr_AS$total_g ~ 1))
-#lambda <- bc$x[which.max(bc$y)]
-#yield_yr_AS$bc_total <- (yield_yr_AS$total_g ^ lambda -1)/lambda
-#shapiro.test(yield_yr_AS$bc_total)
-
-# log
-#yield_yr_AS$log_total <- log10(yield_yr_AS$total_g)
-#shapiro.test(yield_yr_AS$log_total)
-
-```
-2023 only: normal distribution
-
-```{r}
-# original dataset
-hist(yield_23_AS$total_g)
-skewness(yield_23_AS$total_g, na.rm = TRUE)
-qqnorm(yield_23_AS$total_g, main='Normal')
-qqline(yield_23_AS$total_g)
-shapiro.test(yield_23_AS$total_g)
-
-```
-2024 only: normal distribution
-
-```{r}
-# original dataset
-
-hist(yield_24_AS$total_g)
-skewness(yield_24_AS$total_g, na.rm = TRUE)
-qqnorm(yield_24_AS$total_g, main='Normal')
-qqline(yield_24_AS$total_g)
-shapiro.test(yield_24_AS$total_g)
-
-```
-
-#### Beans
-
-##### Marketable yield
-
-Original dataset is non-parametric. Lambda is close to 0, indicating log or boxcox, but neither achieves a normal distribution
-```{r}
-hist(yield_yr_DB$marketable_g)
-skewness(yield_yr_DB$marketable_g, na.rm = TRUE)
-qqnorm(yield_yr_DB$marketable_g, main='Normal')
-qqline(yield_yr_DB$marketable_g)
-shapiro.test(yield_yr_DB$marketable_g)
-
-#boxcox
-#bc <- boxcox(lm(yield_yr_DB$marketable_g ~ 1))
-#lambda <- bc$x[which.max(bc$y)]
-#yield_yr_DB$bc_marketable <- (yield_yr_DB$marketable_g ^ lambda -1)/lambda
-#shapiro.test(yield_yr_DB$bc_marketable)
-
-#log
-#yield_yr_DB$log_marketable <- log10(yield_yr_DB$marketable_g)
-#shapiro.test(yield_yr_DB$log_marketable)
-
-```
-
-2023 only: normal distribution
-
-```{r}
-# original dataset
-hist(yield_23_DB$marketable_g)
-skewness(yield_23_DB$marketable_g, na.rm = TRUE)
-qqnorm(yield_23_DB$marketable_g, main='Normal')
-qqline(yield_23_DB$marketable_g)
-shapiro.test(yield_23_DB$marketable_g)
-
-```
-
-2024 only: The dataset is non-parametric. Lambda indicates that either a boxcox, inverse, or inverse sqrt would be best. All work, but boxcox is best
-```{r}
-# original dataset
-hist(yield_24_DB$marketable_g)
-skewness(yield_24_DB$marketable_g, na.rm = TRUE)
-qqnorm(yield_24_DB$marketable_g, main='Normal')
-qqline(yield_24_DB$marketable_g)
-shapiro.test(yield_24_DB$marketable_g)
-
-#boxcox transformation
-bc <- boxcox(lm(yield_24_DB$marketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_24_DB$bc_marketable <- (yield_24_DB$marketable_g ^ lambda -1)/lambda
-
-hist(yield_24_DB$bc_marketable)
-skewness(yield_24_DB$bc_marketable, na.rm = TRUE)
-qqnorm(yield_24_DB$bc_marketable, main='Normal')
-qqline(yield_24_DB$bc_marketable)
-shapiro.test(yield_24_DB$bc_marketable)
-
-#inverse
-#yield_24_DB$inverse_marketable <- 1/yield_24_DB$marketable_g
-#shapiro.test(yield_24_DB$inverse_marketable)
-
-#inverse sqrt
-#yield_24_DB$sqrt_in_marketable <- 1/sqrt(yield_24_DB$marketable_g)
-#shapiro.test(yield_24_DB$sqrt_in_marketable)
-```
-
-##### Percent marketable
-Original dataset is non-parametric. Lambda is off the charts, and there is no transformation that is going to fix this lol
-```{r}
-hist(yield_yr_DB$per_market)
-skewness(yield_yr_DB$per_market, na.rm = TRUE)
-qqnorm(yield_yr_DB$per_market, main='Normal')
-qqline(yield_yr_DB$per_market)
-shapiro.test(yield_yr_DB$per_market)
-
-#boxcox
-#bc <- boxcox(lm(yield_yr_DB$per_market ~ 1))
-#lambda <- bc$x[which.max(bc$y)]
-#yield_yr_DB$bc_per <- (yield_yr_DB$per_market ^ lambda -1)/lambda
-#shapiro.test(yield_yr_DB$bc_per)
-
-```
-
-2023 only: everything is 100%, so there is no distribution.
-
-```{r}
-# original dataset
-hist(yield_23_DB$per_market)
-skewness(yield_23_DB$per_market, na.rm = TRUE)
-qqnorm(yield_23_DB$per_market, main='Normal')
-qqline(yield_23_DB$per_market)
-
-```
-2024 only: the lambda is off the charts, so this one will also stay non-parametric
-```{r}
-# original dataset
-hist(yield_24_DB$per_market)
-skewness(yield_24_DB$per_market, na.rm = TRUE)
-qqnorm(yield_24_DB$per_market, main='Normal')
-qqline(yield_24_DB$per_market)
-shapiro.test(yield_24_DB$per_market)
-bc <- boxcox(lm(yield_24_DB$per_market ~ 1))
-```
-
-##### Unmarketable yield
-There is no way to make this a normal distribution.
-```{r}
-hist(yield_yr_DB$unmarketable_g)
-skewness(yield_yr_DB$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_yr_DB$unmarketable_g, main='Normal')
-qqline(yield_yr_DB$unmarketable_g)
-shapiro.test(yield_yr_DB$unmarketable_g)
-bc <- boxcox(lm((yield_yr_DB$unmarketable_g + 1) ~ 1))
-```
-
-2023 only: non-parametric
-```{r}
-hist(yield_23_DB$unmarketable_g)
-skewness(yield_23_DB$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_23_DB$unmarketable_g, main='Normal')
-qqline(yield_23_DB$unmarketable_g)
-
-```
-
-2024 only: non-parametric
-```{r}
-
-hist(yield_24_DB$unmarketable_g)
-skewness(yield_24_DB$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_24_DB$unmarketable_g, main='Normal')
-qqline(yield_24_DB$unmarketable_g)
-shapiro.test(yield_24_DB$unmarketable_g)
-bc <- boxcox(lm((yield_24_DB$unmarketable_g + 1) ~ 1))
-
-```
-
-##### Total yield
-
-The original dataset is non-parametric. Lambda indicates that boxcox or log transformation are best suited. Neither, however, results in a normal distribution
-```{r}
-hist(yield_yr_DB$total_g)
-skewness(yield_yr_DB$total_g, na.rm = TRUE)
-qqnorm(yield_yr_DB$total_g, main='Normal')
-qqline(yield_yr_DB$total_g)
-shapiro.test(yield_yr_DB$total_g)
-
-#boxcox
-#bc <- boxcox(lm(yield_yr_DB$total_g ~ 1))
-#lambda <- bc$x[which.max(bc$y)]
-#yield_yr_DB$bc_total <- (yield_yr_DB$total_g ^ lambda -1)/lambda
-#shapiro.test(yield_yr_DB$bc_total)
-
-#log
-#yield_yr_DB$log_total <- log10(yield_yr_DB$total_g)
-#shapiro.test(yield_yr_DB$log_total)
-
-```
-
-2023 only: normal distribution
-
-```{r}
-hist(yield_23_DB$total_g)
-skewness(yield_23_DB$total_g, na.rm = TRUE)
-qqnorm(yield_23_DB$total_g, main='Normal')
-qqline(yield_23_DB$total_g)
-shapiro.test(yield_23_DB$total_g)
-
-```
-
-2024 only: The original dataset is non-parametric. The lambda indicates a boxcox, inverse, or inverse sqrt would be most appropriate. All are successful, but the boxcox is the best
-
-```{r}
-hist(yield_24_DB$total_g)
-skewness(yield_24_DB$total_g, na.rm = TRUE)
-qqnorm(yield_24_DB$total_g, main='Normal')
-qqline(yield_24_DB$total_g)
-shapiro.test(yield_24_DB$total_g)
-
-#boxcox
-bc <- boxcox(lm(yield_24_DB$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_24_DB$bc_total <- (yield_24_DB$total_g ^ lambda -1)/lambda
-
-hist(yield_24_DB$bc_total)
-skewness(yield_24_DB$bc_total, na.rm = TRUE)
-qqnorm(yield_24_DB$bc_total, main='Normal')
-qqline(yield_24_DB$bc_total)
-shapiro.test(yield_24_DB$bc_total)
-
-#inverse
-#yield_24_DB$inverse_total <- 1/yield_24_DB$total_g
-#shapiro.test(yield_24_DB$inverse_total)
-
-#inverse sqrt
-#yield_24_DB$inverse_sqrt_total <- 1/sqrt(yield_24_DB$total_g)
-#shapiro.test(yield_24_DB$inverse_sqrt_total)
-
-```
-
-#### Collards
-
-##### Marketable yield
-
-The original dataset is normally distributed
-```{r}
-# original dataset
-hist(yield_yr_FC$marketable_g)
-skewness(yield_yr_FC$marketable_g, na.rm = TRUE)
-qqnorm(yield_yr_FC$marketable_g, main='Normal')
-qqline(yield_yr_FC$marketable_g)
-shapiro.test(yield_yr_FC$marketable_g)
-
-```
-
-2023 only: The original dataset is non-parametric. The lambda is about 1.5, indicating that a boxcox, square, or cubic transformation would be best. Cubic offers the best distribution (p = 0.9)
-
-```{r}
-# original dataset
-hist(yield_23_FC$marketable_g)
-skewness(yield_23_FC$marketable_g, na.rm = TRUE)
-qqnorm(yield_23_FC$marketable_g, main='Normal')
-qqline(yield_23_FC$marketable_g)
-shapiro.test(yield_23_FC$marketable_g)
-
-#boxcox
-bc <- boxcox(lm(yield_23_FC$marketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_23_FC$bc_market <- (yield_23_FC$marketable_g ^ lambda -1)/lambda
-
-hist(yield_23_FC$bc_market)
-skewness(yield_23_FC$bc_market, na.rm = TRUE)
-qqnorm(yield_23_FC$bc_market, main='Normal')
-qqline(yield_23_FC$bc_market)
-shapiro.test(yield_23_FC$bc_market)
-
-#squared
-yield_23_FC$sq_market <- yield_23_FC$marketable_g^2
-
-hist(yield_23_FC$sq_market)
-skewness(yield_23_FC$sq_market, na.rm = TRUE)
-qqnorm(yield_23_FC$sq_market, main='Normal')
-qqline(yield_23_FC$sq_market)
-shapiro.test(yield_23_FC$sq_market)
-
-#cubic
-yield_23_FC$cubic_market <- yield_23_FC$marketable_g^3
-
-hist(yield_23_FC$cubic_market)
-skewness(yield_23_FC$cubic_market, na.rm = TRUE)
-qqnorm(yield_23_FC$cubic_market, main='Normal')
-qqline(yield_23_FC$cubic_market)
-shapiro.test(yield_23_FC$cubic_market)
-
-
-```
-2024 only: normal distribution
-
-```{r}
-# original dataset
-hist(yield_24_AS$marketable_g)
-skewness(yield_24_AS$marketable_g, na.rm = TRUE)
-qqnorm(yield_24_AS$marketable_g, main='Normal')
-qqline(yield_24_AS$marketable_g)
-shapiro.test(yield_24_AS$marketable_g)
-
-```
-
-##### Percent marketable
-
-The original dataset is normally distributed
-```{r}
-# original dataset
-hist(yield_yr_FC$per_market)
-skewness(yield_yr_FC$per_market, na.rm = TRUE)
-qqnorm(yield_yr_FC$per_market, main='Normal')
-qqline(yield_yr_FC$per_market)
-shapiro.test(yield_yr_FC$per_market)
-
-```
-2023 only: normal distribution
-
-```{r}
-# original dataset
-
-hist(yield_23_FC$per_market)
-skewness(yield_23_FC$per_market, na.rm = TRUE)
-qqnorm(yield_23_FC$per_market, main='Normal')
-qqline(yield_23_FC$per_market)
-shapiro.test(yield_23_FC$per_market)
-
-```
-2024 only: Normal distribution (p = 0.09), though a boxcox transformation improves it
-
-```{r}
-# original dataset
-hist(yield_24_FC$per_market)
-skewness(yield_24_FC$per_market, na.rm = TRUE)
-qqnorm(yield_24_FC$per_market, main='Normal')
-qqline(yield_24_FC$per_market)
-shapiro.test(yield_24_FC$per_market)
-
-#boxcox transformation
-bc <- boxcox(lm(yield_24_FC$per_market ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_24_FC$bc_per <- (yield_24_FC$per_market ^ lambda -1)/lambda
-
-hist(yield_24_FC$bc_per)
-skewness(yield_24_FC$bc_per, na.rm = TRUE)
-qqnorm(yield_24_FC$bc_per, main='Normal')
-qqline(yield_24_FC$bc_per)
-shapiro.test(yield_24_FC$bc_per)
-
-#log
-yield_24_FC$log_per <- log10(yield_24_FC$per_market)
-
-hist(yield_24_FC$log_per)
-skewness(yield_24_FC$log_per, na.rm = TRUE)
-qqnorm(yield_24_FC$log_per, main='Normal')
-qqline(yield_24_FC$log_per)
-shapiro.test(yield_24_FC$log_per)
-
-```
-
-##### Unmarketable yield
-
-The original dataset is non-parametric. A boxcox or log transformation achieves a normal distribution and have similar p-values.
-```{r}
-#original dataset
-hist(yield_yr_FC$unmarketable_g)
-skewness(yield_yr_FC$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_yr_FC$unmarketable_g, main='Normal')
-qqline(yield_yr_FC$unmarketable_g)
-shapiro.test(yield_yr_FC$unmarketable_g)
-
-#boxcox
-bc <- boxcox(lm(yield_yr_FC$unmarketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_yr_FC$bc_unmarketable <- (yield_yr_FC$unmarketable_g ^ lambda -1)/lambda
-
-hist(yield_yr_FC$bc_unmarketable)
-skewness(yield_yr_FC$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_yr_FC$bc_unmarketable, main='Normal')
-qqline(yield_yr_FC$bc_unmarketable)
-shapiro.test(yield_yr_FC$bc_unmarketable)
-
-#sqrt
-yield_yr_FC$log_market <- sqrt(yield_yr_FC$unmarketable_g)
-
-hist(yield_yr_FC$log_market)
-skewness(yield_yr_FC$log_market, na.rm = TRUE)
-qqnorm(yield_yr_FC$log_market, main='Normal')
-qqline(yield_yr_FC$log_market)
-shapiro.test(yield_yr_FC$log_market)
-
-```
-
-2023 only: The original dataset is non-parametric. Lambda indicates a boxcox or square transformation will be best, and I'll try a cubic -- which is the one that ultimately achieved the normal distribution.
-
-```{r}
-# original dataset
-hist(yield_23_FC$unmarketable_g)
-skewness(yield_23_FC$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_23_FC$unmarketable_g, main='Normal')
-qqline(yield_23_FC$unmarketable_g)
-shapiro.test(yield_23_FC$unmarketable_g)
-
-#boxcox
-bc <- boxcox(lm(yield_23_FC$unmarketable_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_23_FC$bc_unmarketable <- (yield_23_FC$unmarketable_g ^ lambda -1)/lambda
-
-hist(yield_23_FC$bc_unmarketable)
-skewness(yield_23_FC$bc_unmarketable, na.rm = TRUE)
-qqnorm(yield_23_FC$bc_unmarketable, main='Normal')
-qqline(yield_23_FC$bc_unmarketable)
-shapiro.test(yield_23_FC$bc_unmarketable)
-
-#squared 
-yield_23_FC$sq_unmarketable <- yield_23_FC$unmarketable_g^2
-
-hist(yield_23_FC$sq_unmarketable)
-skewness(yield_23_FC$sq_unmarketable, na.rm = TRUE)
-qqnorm(yield_23_FC$sq_unmarketable, main='Normal')
-qqline(yield_23_FC$sq_unmarketable)
-shapiro.test(yield_23_FC$sq_unmarketable)
-
-#cubic 
-yield_23_FC$cubic_unmarketable <- yield_23_FC$unmarketable_g^3
-
-hist(yield_23_FC$cubic_unmarketable)
-skewness(yield_23_FC$cubic_unmarketable, na.rm = TRUE)
-qqnorm(yield_23_FC$cubic_unmarketable, main='Normal')
-qqline(yield_23_FC$cubic_unmarketable)
-shapiro.test(yield_23_FC$cubic_unmarketable)
-
-```
-
-2024 only: normal distribution
-
-```{r}
-# original dataset
-hist(yield_24_FC$unmarketable_g)
-skewness(yield_24_FC$unmarketable_g, na.rm = TRUE)
-qqnorm(yield_24_FC$unmarketable_g, main='Normal')
-qqline(yield_24_FC$unmarketable_g)
-shapiro.test(yield_24_FC$unmarketable_g)
-
-```
-
-##### Total yield
-
-The original dataset is normally distributed
-```{r}
-#original data set
-hist(yield_yr_FC$total_g)
-skewness(yield_yr_FC$total_g, na.rm = TRUE)
-qqnorm(yield_yr_FC$total_g, main='Normal')
-qqline(yield_yr_FC$total_g)
-shapiro.test(yield_yr_FC$total_g)
-
-```
-2023 only: The original dataset is non-parametric. Lambda indicates that squared or cubic transformation will be best. Cubic is the only one that results in a normal distribution
-
-```{r}
-# original dataset
-hist(yield_23_FC$total_g)
-skewness(yield_23_FC$total_g, na.rm = TRUE)
-qqnorm(yield_23_FC$total_g, main='Normal')
-qqline(yield_23_FC$total_g)
-shapiro.test(yield_23_FC$total_g)
-
-#boxcox
-bc <- boxcox(lm(yield_23_FC$total_g ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-yield_23_FC$bc_total <- (yield_23_FC$total_g ^ lambda -1)/lambda
-
-hist(yield_23_FC$bc_total)
-skewness(yield_23_FC$bc_total, na.rm = TRUE)
-qqnorm(yield_23_FC$bc_total, main='Normal')
-qqline(yield_23_FC$bc_total)
-shapiro.test(yield_23_FC$bc_total)
-
-#squared 
-yield_23_FC$sq_total <- yield_23_FC$total_g^2
-
-hist(yield_23_FC$sq_total)
-skewness(yield_23_FC$sq_total, na.rm = TRUE)
-qqnorm(yield_23_FC$sq_total, main='Normal')
-qqline(yield_23_FC$sq_total)
-shapiro.test(yield_23_FC$sq_total)
-
-#cubic 
-yield_23_FC$cubic_total <- yield_23_FC$total_g^3
-
-hist(yield_23_FC$cubic_total)
-skewness(yield_23_FC$cubic_total, na.rm = TRUE)
-qqnorm(yield_23_FC$cubic_total, main='Normal')
-qqline(yield_23_FC$cubic_total)
-shapiro.test(yield_23_FC$cubic_total)
-
-```
-2024 only: normal distribution
-
-```{r}
-# original dataset
-
-hist(yield_24_AS$total_g)
-skewness(yield_24_AS$total_g, na.rm = TRUE)
-qqnorm(yield_24_AS$total_g, main='Normal')
-qqline(yield_24_AS$total_g)
-shapiro.test(yield_24_AS$total_g)
-
-```
-
-### SPAD
-At what point do we mark values as NA because the SPAD just can't go that high? We didn't have an answer for this because it doesn't seem like any of our measurements were "too high" for the meter. saying that, I'm suspicious of the measurements over 66.  Regardless, it doesn't make sense to check for normality for the whole data set, when I literally have to separate by crop for analysis, so doing that
-
-
-#### Strawberries
-
-##### outliers removed
-
-The original dataset is non-parametric. Lambda is between 0.5 and 1, indicating that a sqrt or boxcox transformation would be best suited, but neither results in a normal distribution
-```{r}
-#original dataset
-hist(spad_AS$value)
-skewness(spad_AS$value, na.rm = TRUE)
-qqnorm(spad_AS$value, main='Normal')
-qqline(spad_AS$value)
-shapiro.test(spad_AS$value)
-
-#boxcox
-bc <- boxcox(lm(spad_AS$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_AS$bc_value <- (spad_AS$value ^ lambda -1)/lambda
-
-hist(spad_AS$bc_value)
-skewness(spad_AS$bc_value, na.rm = TRUE)
-qqnorm(spad_AS$bc_value, main='Normal')
-qqline(spad_AS$bc_value)
-shapiro.test(spad_AS$bc_value)
-
-# sqrt
-spad_AS$sqrt_value <- sqrt(spad_AS$value)
-
-hist(spad_AS$sqrt_value)
-skewness(spad_AS$sqrt_value, na.rm = TRUE)
-qqnorm(spad_AS$sqrt_value, main='Normal')
-qqline(spad_AS$sqrt_value)
-shapiro.test(spad_AS$sqrt_value)
-```
-
-2023 only: The dataset is non-parametric. Lambda is between 0 and 0.5, indicating a log, sqrt, or boxcox transformation would be most appropriate. All are successful, but boxcox is the most normal distribution
-```{r}
-spad_23_AS <- subset(spad_AS, year == "2023")
-
-#original dataset
-hist(spad_23_AS$value)
-skewness(spad_23_AS$value, na.rm = TRUE)
-qqnorm(spad_23_AS$value, main='Normal')
-qqline(spad_23_AS$value)
-shapiro.test(spad_23_AS$value)
-
-#boxcox
-bc <- boxcox(lm(spad_23_AS$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_23_AS$bc_value <- (spad_23_AS$value ^ lambda -1)/lambda
-
-hist(spad_23_AS$bc_value)
-skewness(spad_23_AS$bc_value, na.rm = TRUE)
-qqnorm(spad_23_AS$bc_value, main='Normal')
-qqline(spad_23_AS$bc_value)
-shapiro.test(spad_23_AS$bc_value)
-
-# log
-spad_23_AS$log_value <- log10(spad_23_AS$value)
-
-hist(spad_23_AS$log_value)
-skewness(spad_23_AS$log_value, na.rm = TRUE)
-qqnorm(spad_23_AS$log_value, main='Normal')
-qqline(spad_23_AS$log_value)
-shapiro.test(spad_23_AS$log_value)
-
-
-# sqrt
-spad_23_AS$sqrt_value <- sqrt(spad_23_AS$value)
-
-hist(spad_23_AS$sqrt_value)
-skewness(spad_23_AS$sqrt_value, na.rm = TRUE)
-qqnorm(spad_23_AS$sqrt_value, main='Normal')
-qqline(spad_23_AS$sqrt_value)
-shapiro.test(spad_23_AS$sqrt_value)
-```
-
-2024 only: The dataset is non-parametric with a lambda between 1 and 2, indicating a boxcox or square transformation would be most appropriate. Neither are successful, though
-```{r}
-spad_24_AS <- subset(spad_AS, year == "2024")
-
-#original dataset
-hist(spad_24_AS$value)
-skewness(spad_24_AS$value, na.rm = TRUE)
-qqnorm(spad_24_AS$value, main='Normal')
-qqline(spad_24_AS$value)
-shapiro.test(spad_24_AS$value)
-
-#boxcox
-bc <- boxcox(lm(spad_24_AS$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_24_AS$bc_value <- (spad_24_AS$value ^ lambda -1)/lambda
-
-hist(spad_24_AS$bc_value)
-skewness(spad_24_AS$bc_value, na.rm = TRUE)
-qqnorm(spad_24_AS$bc_value, main='Normal')
-qqline(spad_24_AS$bc_value)
-shapiro.test(spad_24_AS$bc_value)
-
-# squared
-spad_24_AS$sq_value <- spad_24_AS$value^2
-
-hist(spad_24_AS$sq_value)
-skewness(spad_24_AS$sq_value, na.rm = TRUE)
-qqnorm(spad_24_AS$sq_value, main='Normal')
-qqline(spad_24_AS$sq_value)
-shapiro.test(spad_24_AS$sq_value)
-
-```
-
-
-##### including outliers
-
-The dataset is non-parametric, with a lambda close to -0.5, indicating an inverse square root, log, or boxcox will be most appropriate. None achieve a normal distribution
-```{r}
-#original dataset
-hist(spad_AS_out$value)
-skewness(spad_AS_out$value, na.rm = TRUE)
-qqnorm(spad_AS_out$value, main='Normal')
-qqline(spad_AS_out$value)
-shapiro.test(spad_AS_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_AS_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_AS_out$bc_value <- (spad_AS_out$value ^ lambda -1)/lambda
-
-hist(spad_AS_out$bc_value)
-skewness(spad_AS_out$bc_value, na.rm = TRUE)
-qqnorm(spad_AS_out$bc_value, main='Normal')
-qqline(spad_AS_out$bc_value)
-shapiro.test(spad_AS_out$bc_value)
-
-# log
-spad_AS_out$log_value <- log10(spad_AS_out$value)
-
-hist(spad_AS_out$log_value)
-skewness(spad_AS_out$log_value, na.rm = TRUE)
-qqnorm(spad_AS_out$log_value, main='Normal')
-qqline(spad_AS_out$log_value)
-shapiro.test(spad_AS_out$log_value) 
-
-# inverse sqrt
-spad_AS_out$in_sqrt_value <- 1/sqrt(spad_AS_out$value)
-
-hist(spad_AS_out$in_sqrt_value)
-skewness(spad_AS_out$in_sqrt_value, na.rm = TRUE)
-qqnorm(spad_AS_out$in_sqrt_value, main='Normal')
-qqline(spad_AS_out$in_sqrt_value)
-shapiro.test(spad_AS_out$in_sqrt_value)
-```
-
-2023 only: The dataset is non-parametric. Lambda is between 0 and 0.5, indicating a log, sqrt, or boxcox transformation would be most appropriate. All are successful, but boxcox is the most normal distribution
-```{r}
-spad_23_AS_out <- subset(spad_AS_out, year == "2023")
-
-#original dataset
-hist(spad_23_AS_out$value)
-skewness(spad_23_AS_out$value, na.rm = TRUE)
-qqnorm(spad_23_AS_out$value, main='Normal')
-qqline(spad_23_AS_out$value)
-shapiro.test(spad_23_AS_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_23_AS_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_23_AS_out$bc_value <- (spad_23_AS_out$value ^ lambda -1)/lambda
-
-hist(spad_23_AS_out$bc_value)
-skewness(spad_23_AS_out$bc_value, na.rm = TRUE)
-qqnorm(spad_23_AS_out$bc_value, main='Normal')
-qqline(spad_23_AS_out$bc_value)
-shapiro.test(spad_23_AS_out$bc_value)
-
-# log
-spad_23_AS_out$log_value <- log10(spad_23_AS_out$value)
-
-hist(spad_23_AS_out$log_value)
-skewness(spad_23_AS_out$log_value, na.rm = TRUE)
-qqnorm(spad_23_AS_out$log_value, main='Normal')
-qqline(spad_23_AS_out$log_value)
-shapiro.test(spad_23_AS_out$log_value)
-
-# sqrt
-spad_23_AS_out$sqrt_value <- sqrt(spad_23_AS_out$value)
-
-hist(spad_23_AS_out$sqrt_value)
-skewness(spad_23_AS_out$sqrt_value, na.rm = TRUE)
-qqnorm(spad_23_AS_out$sqrt_value, main='Normal')
-qqline(spad_23_AS_out$sqrt_value)
-shapiro.test(spad_23_AS_out$sqrt_value)
-```
-
-2024 only: The dataset is non-parametric with a lambda between 0 and -0.5, indicating a boxcox, log, or inverse sqrt transformation would be most appropriate. None are successful, though
-```{r}
-spad_24_AS_out <- subset(spad_AS_out, year == "2024")
-
-#original dataset
-hist(spad_24_AS_out$value)
-skewness(spad_24_AS_out$value, na.rm = TRUE)
-qqnorm(spad_24_AS_out$value, main='Normal')
-qqline(spad_24_AS_out$value)
-shapiro.test(spad_24_AS_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_24_AS_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_24_AS_out$bc_value <- (spad_24_AS_out$value ^ lambda -1)/lambda
-
-hist(spad_24_AS_out$bc_value)
-skewness(spad_24_AS_out$bc_value, na.rm = TRUE)
-qqnorm(spad_24_AS_out$bc_value, main='Normal')
-qqline(spad_24_AS_out$bc_value)
-shapiro.test(spad_24_AS_out$bc_value)
-
-# log
-spad_24_AS_out$log_value <- log10(spad_24_AS_out$value)
-
-hist(spad_24_AS_out$log_value)
-skewness(spad_24_AS_out$log_value, na.rm = TRUE)
-qqnorm(spad_24_AS_out$log_value, main='Normal')
-qqline(spad_24_AS_out$log_value)
-shapiro.test(spad_24_AS_out$log_value)
-
-# inverse square root
-spad_24_AS_out$in_sqrt_value <- 1/sqrt(spad_24_AS_out$value)
-
-hist(spad_24_AS_out$in_sqrt_value)
-skewness(spad_24_AS_out$in_sqrt_value, na.rm = TRUE)
-qqnorm(spad_24_AS_out$in_sqrt_value, main='Normal')
-qqline(spad_24_AS_out$in_sqrt_value)
-shapiro.test(spad_24_AS_out$in_sqrt_value)
-
-```
-
-
-#### Beans
-
-##### outliers removed
-
-The original dataset is non-parametric. Lambda is close to 1, indicating that a square root or boxcox transformation might work, but neither results in a normal distribution
-```{r}
-#original dataset
-hist(spad_DB$value)
-skewness(spad_DB$value, na.rm = TRUE)
-qqnorm(spad_DB$value, main='Normal')
-qqline(spad_DB$value)
-shapiro.test(spad_DB$value)
-
-#boxcox
-bc <- boxcox(lm(spad_DB$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_DB$bc_value <- (spad_DB$value ^ lambda -1)/lambda
-
-hist(spad_DB$bc_value)
-skewness(spad_DB$bc_value, na.rm = TRUE)
-qqnorm(spad_DB$bc_value, main='Normal')
-qqline(spad_DB$bc_value)
-shapiro.test(spad_DB$bc_value)
-
-# sqrt
-spad_DB$sqrt_value <- sqrt(spad_DB$value)
-
-hist(spad_DB$sqrt_value)
-skewness(spad_DB$sqrt_value, na.rm = TRUE)
-qqnorm(spad_DB$sqrt_value, main='Normal')
-qqline(spad_DB$sqrt_value)
-shapiro.test(spad_DB$sqrt_value)
-
-```
-
-2023 only: The dataset is non-parametric. Lambda is between 0 and -0.5, indicating a log, sqrt, or boxcox transformation would be most appropriate. None result in a normal distribution, though
-```{r}
-spad_23_DB <- subset(spad_DB, year == "2023")
-
-#original dataset
-hist(spad_23_DB$value)
-skewness(spad_23_DB$value, na.rm = TRUE)
-qqnorm(spad_23_DB$value, main='Normal')
-qqline(spad_23_DB$value)
-shapiro.test(spad_23_DB$value)
-
-#boxcox
-bc <- boxcox(lm(spad_23_DB$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_23_DB$bc_value <- (spad_23_DB$value ^ lambda -1)/lambda
-
-hist(spad_23_DB$bc_value)
-skewness(spad_23_DB$bc_value, na.rm = TRUE)
-qqnorm(spad_23_DB$bc_value, main='Normal')
-qqline(spad_23_DB$bc_value)
-shapiro.test(spad_23_DB$bc_value)
-
-# log
-spad_23_DB$log_value <- log10(spad_23_DB$value)
-
-hist(spad_23_DB$log_value)
-skewness(spad_23_DB$log_value, na.rm = TRUE)
-qqnorm(spad_23_DB$log_value, main='Normal')
-qqline(spad_23_DB$log_value)
-shapiro.test(spad_23_DB$log_value)
-
-
-# inverse sqrt
-spad_23_DB$sqrt_value <- 1/sqrt(spad_23_DB$value)
-
-hist(spad_23_DB$sqrt_value)
-skewness(spad_23_DB$sqrt_value, na.rm = TRUE)
-qqnorm(spad_23_DB$sqrt_value, main='Normal')
-qqline(spad_23_DB$sqrt_value)
-shapiro.test(spad_23_DB$sqrt_value)
-```
-
-2024 only: The dataset is non-parametric with a lambda between 1 and 2, indicating a boxcox or square transformation would be most appropriate. Neither are successful, though
-```{r}
-spad_24_DB <- subset(spad_DB, year == "2024")
-
-#original dataset
-hist(spad_24_DB$value)
-skewness(spad_24_DB$value, na.rm = TRUE)
-qqnorm(spad_24_DB$value, main='Normal')
-qqline(spad_24_DB$value)
-shapiro.test(spad_24_DB$value)
-
-#boxcox
-bc <- boxcox(lm(spad_24_DB$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_24_DB$bc_value <- (spad_24_DB$value ^ lambda -1)/lambda
-
-hist(spad_24_DB$bc_value)
-skewness(spad_24_DB$bc_value, na.rm = TRUE)
-qqnorm(spad_24_DB$bc_value, main='Normal')
-qqline(spad_24_DB$bc_value)
-shapiro.test(spad_24_DB$bc_value)
-
-# squared
-spad_24_DB$sq_value <- spad_24_DB$value^2
-
-hist(spad_24_DB$sq_value)
-skewness(spad_24_DB$sq_value, na.rm = TRUE)
-qqnorm(spad_24_DB$sq_value, main='Normal')
-qqline(spad_24_DB$sq_value)
-shapiro.test(spad_24_DB$sq_value)
-
-```
-
-
-##### including outliers
-
-The dataset is non-parametric, with a lambda close between 1 and 2, indicating an squared or boxcox will be most appropriate. Neither achieve a normal distribution
-```{r}
-#original dataset
-hist(spad_DB_out$value)
-skewness(spad_DB_out$value, na.rm = TRUE)
-qqnorm(spad_DB_out$value, main='Normal')
-qqline(spad_DB_out$value)
-shapiro.test(spad_DB_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_DB_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_DB_out$bc_value <- (spad_DB_out$value ^ lambda -1)/lambda
-
-hist(spad_DB_out$bc_value)
-skewness(spad_DB_out$bc_value, na.rm = TRUE)
-qqnorm(spad_DB_out$bc_value, main='Normal')
-qqline(spad_DB_out$bc_value)
-shapiro.test(spad_DB_out$bc_value)
-
-# squared
-spad_DB_out$sq_value <- spad_DB_out$value^2
-
-hist(spad_DB_out$sq_value)
-skewness(spad_DB_out$sq_value, na.rm = TRUE)
-qqnorm(spad_DB_out$sq_value, main='Normal')
-qqline(spad_DB_out$sq_value)
-shapiro.test(spad_DB_out$sq_value) 
-
-```
-
-2023 only: The dataset is non-parametric. Lambda is between 0.5 and 1, indicating a sqrt or boxcox transformation would be most appropriate. Neither results in a normal distribution though
-```{r}
-spad_23_DB_out <- subset(spad_DB_out, year == "2023")
-
-#original dataset
-hist(spad_23_DB_out$value)
-skewness(spad_23_DB_out$value, na.rm = TRUE)
-qqnorm(spad_23_DB_out$value, main='Normal')
-qqline(spad_23_DB_out$value)
-shapiro.test(spad_23_DB_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_23_DB_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_23_DB_out$bc_value <- (spad_23_DB_out$value ^ lambda -1)/lambda
-
-hist(spad_23_DB_out$bc_value)
-skewness(spad_23_DB_out$bc_value, na.rm = TRUE)
-qqnorm(spad_23_DB_out$bc_value, main='Normal')
-qqline(spad_23_DB_out$bc_value)
-shapiro.test(spad_23_DB_out$bc_value)
-
-# sqrt
-spad_23_DB_out$sqrt_value <- sqrt(spad_23_DB_out$value)
-
-hist(spad_23_DB_out$sqrt_value)
-skewness(spad_23_DB_out$sqrt_value, na.rm = TRUE)
-qqnorm(spad_23_DB_out$sqrt_value, main='Normal')
-qqline(spad_23_DB_out$sqrt_value)
-shapiro.test(spad_23_DB_out$sqrt_value)
-```
-
-2024 only: The dataset is non-parametric with a lambda between 1 and 2, indicating a boxcox or squared. Neither are successful, though
-```{r}
-spad_24_DB_out <- subset(spad_DB_out, year == "2024")
-
-#original dataset
-hist(spad_24_DB_out$value)
-skewness(spad_24_DB_out$value, na.rm = TRUE)
-qqnorm(spad_24_DB_out$value, main='Normal')
-qqline(spad_24_DB_out$value)
-shapiro.test(spad_24_DB_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_24_DB_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_24_DB_out$bc_value <- (spad_24_DB_out$value ^ lambda -1)/lambda
-
-hist(spad_24_DB_out$bc_value)
-skewness(spad_24_DB_out$bc_value, na.rm = TRUE)
-qqnorm(spad_24_DB_out$bc_value, main='Normal')
-qqline(spad_24_DB_out$bc_value)
-shapiro.test(spad_24_DB_out$bc_value)
-
-# log
-spad_24_DB_out$sq_value <- spad_24_DB_out$value^2
-
-hist(spad_24_DB_out$sq_value)
-skewness(spad_24_DB_out$sq_value, na.rm = TRUE)
-qqnorm(spad_24_DB_out$sq_value, main='Normal')
-qqline(spad_24_DB_out$sq_value)
-shapiro.test(spad_24_DB_out$sq_value)
-
-
-```
-
-#### collards
-
-##### outliers removed
-
-The original dataset is non-parametric. Lambda is between 0 and 0.5, indicating that a square root or boxcox transformation would be best suited, but neither results in a normal distribution
-```{r}
-#original dataset
-hist(spad_FC$value)
-skewness(spad_FC$value, na.rm = TRUE)
-qqnorm(spad_FC$value, main='Normal')
-qqline(spad_FC$value)
-shapiro.test(spad_FC$value)
-
-#boxcox
-bc <- boxcox(lm(spad_FC$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_FC$bc_value <- (spad_FC$value ^ lambda -1)/lambda
-
-hist(spad_FC$bc_value)
-skewness(spad_FC$bc_value, na.rm = TRUE)
-qqnorm(spad_FC$bc_value, main='Normal')
-qqline(spad_FC$bc_value)
-shapiro.test(spad_FC$bc_value)
-
-# sqrt
-spad_FC$sqrt_value <- sqrt(spad_FC$value)
-
-hist(spad_FC$sqrt_value)
-skewness(spad_FC$sqrt_value, na.rm = TRUE)
-qqnorm(spad_FC$sqrt_value, main='Normal')
-qqline(spad_FC$sqrt_value)
-shapiro.test(spad_FC$sqrt_value)
-
-
-```
-
-2023 only: The dataset is non-parametric. Lambda is between 0.5 and 1, indicating a sqrt or boxcox transformation would be most appropriate. Neither achieves a normal distribution though
-```{r}
-spad_23_FC <- subset(spad_FC, year == "2023")
-
-#original dataset
-hist(spad_23_FC$value)
-skewness(spad_23_FC$value, na.rm = TRUE)
-qqnorm(spad_23_FC$value, main='Normal')
-qqline(spad_23_FC$value)
-shapiro.test(spad_23_FC$value)
-
-#boxcox
-bc <- boxcox(lm(spad_23_FC$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_23_FC$bc_value <- (spad_23_FC$value ^ lambda -1)/lambda
-
-hist(spad_23_FC$bc_value)
-skewness(spad_23_FC$bc_value, na.rm = TRUE)
-qqnorm(spad_23_FC$bc_value, main='Normal')
-qqline(spad_23_FC$bc_value)
-shapiro.test(spad_23_FC$bc_value)
-
-# sqrt
-spad_23_FC$sqrt_value <- sqrt(spad_23_FC$value)
-
-hist(spad_23_FC$sqrt_value)
-skewness(spad_23_FC$sqrt_value, na.rm = TRUE)
-qqnorm(spad_23_FC$sqrt_value, main='Normal')
-qqline(spad_23_FC$sqrt_value)
-shapiro.test(spad_23_FC$sqrt_value)
-```
-
-2024 only: normal distribution!
-```{r}
-spad_24_FC <- subset(spad_FC, year == "2024")
-
-#original dataset
-hist(spad_24_FC$value)
-skewness(spad_24_FC$value, na.rm = TRUE)
-qqnorm(spad_24_FC$value, main='Normal')
-qqline(spad_24_FC$value)
-shapiro.test(spad_24_FC$value)
-
-```
-
-
-##### including outliers
-
-The dataset is non-parametric, with a lambda close to -1, indicating an inverse square root, inverse, or boxcox will be most appropriate. None achieve a normal distribution
-```{r}
-#original dataset
-hist(spad_FC_out$value)
-skewness(spad_FC_out$value, na.rm = TRUE)
-qqnorm(spad_FC_out$value, main='Normal')
-qqline(spad_FC_out$value)
-shapiro.test(spad_FC_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_FC_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_FC_out$bc_value <- (spad_FC_out$value ^ lambda -1)/lambda
-
-hist(spad_FC_out$bc_value)
-skewness(spad_FC_out$bc_value, na.rm = TRUE)
-qqnorm(spad_FC_out$bc_value, main='Normal')
-qqline(spad_FC_out$bc_value)
-shapiro.test(spad_FC_out$bc_value)
-
-# inverse sqrt
-spad_FC_out$in_sqrt_value <- 1/sqrt(spad_FC_out$value)
-
-hist(spad_FC_out$in_sqrt_value)
-skewness(spad_FC_out$in_sqrt_value, na.rm = TRUE)
-qqnorm(spad_FC_out$in_sqrt_value, main='Normal')
-qqline(spad_FC_out$in_sqrt_value)
-shapiro.test(spad_FC_out$in_sqrt_value)
-
-# inverse 
-spad_FC_out$inverse_value <- 1/(spad_FC_out$value)
-
-hist(spad_FC_out$inverse_value)
-skewness(spad_FC_out$inverse_value, na.rm = TRUE)
-qqnorm(spad_FC_out$inverse_value, main='Normal')
-qqline(spad_FC_out$inverse_value)
-shapiro.test(spad_FC_out$inverse_value)
-```
-
-2023 only: The dataset is non-parametric. Lambda is between 0.5 and 1, indicating a sqrt or boxcox transformation would be most appropriate. Neither achieve a normal distribution though
-```{r}
-spad_23_FC_out <- subset(spad_FC_out, year == "2023")
-
-#original dataset
-hist(spad_23_FC_out$value)
-skewness(spad_23_FC_out$value, na.rm = TRUE)
-qqnorm(spad_23_FC_out$value, main='Normal')
-qqline(spad_23_FC_out$value)
-shapiro.test(spad_23_FC_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_23_FC_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_23_FC_out$bc_value <- (spad_23_FC_out$value ^ lambda -1)/lambda
-
-hist(spad_23_FC_out$bc_value)
-skewness(spad_23_FC_out$bc_value, na.rm = TRUE)
-qqnorm(spad_23_FC_out$bc_value, main='Normal')
-qqline(spad_23_FC_out$bc_value)
-shapiro.test(spad_23_FC_out$bc_value)
-
-# sqrt
-spad_23_FC_out$sqrt_value <- sqrt(spad_23_FC_out$value)
-
-hist(spad_23_FC_out$sqrt_value)
-skewness(spad_23_FC_out$sqrt_value, na.rm = TRUE)
-qqnorm(spad_23_FC_out$sqrt_value, main='Normal')
-qqline(spad_23_FC_out$sqrt_value)
-shapiro.test(spad_23_FC_out$sqrt_value)
-```
-
-2024 only: The dataset is non-parametric with a lambda between 0 and -0.5, indicating a boxcox, log, or inverse sqrt transformation would be most appropriate. None are successful, though
-```{r}
-spad_24_FC_out <- subset(spad_FC_out, year == "2024")
-
-#original dataset
-hist(spad_24_FC_out$value)
-skewness(spad_24_FC_out$value, na.rm = TRUE)
-qqnorm(spad_24_FC_out$value, main='Normal')
-qqline(spad_24_FC_out$value)
-shapiro.test(spad_24_FC_out$value)
-
-#boxcox
-bc <- boxcox(lm(spad_24_FC_out$value ~ 1))
-lambda <- bc$x[which.max(bc$y)]
-spad_24_FC_out$bc_value <- (spad_24_FC_out$value ^ lambda -1)/lambda
-
-hist(spad_24_FC_out$bc_value)
-skewness(spad_24_FC_out$bc_value, na.rm = TRUE)
-qqnorm(spad_24_FC_out$bc_value, main='Normal')
-qqline(spad_24_FC_out$bc_value)
-shapiro.test(spad_24_FC_out$bc_value)
-
-# log
-spad_24_FC_out$log_value <- log10(spad_24_FC_out$value)
-
-hist(spad_24_FC_out$log_value)
-skewness(spad_24_FC_out$log_value, na.rm = TRUE)
-qqnorm(spad_24_FC_out$log_value, main='Normal')
-qqline(spad_24_FC_out$log_value)
-shapiro.test(spad_24_FC_out$log_value)
-
-# inverse square root
-spad_24_FC_out$in_sqrt_value <- 1/sqrt(spad_24_FC_out$value)
-
-hist(spad_24_FC_out$in_sqrt_value)
-skewness(spad_24_FC_out$in_sqrt_value, na.rm = TRUE)
-qqnorm(spad_24_FC_out$in_sqrt_value, main='Normal')
-qqline(spad_24_FC_out$in_sqrt_value)
-shapiro.test(spad_24_FC_out$in_sqrt_value)
-
-```
 
 ## Weekly yield
 
@@ -2547,20 +332,45 @@ ggplot(subset(yield, year == 2023 & crop == "AS"), aes(x = as.factor(date_collec
 ggplot(subset(yield, year == 2023 & crop == "DB"), aes(x = as.factor(date_collected), y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
 ggplot(subset(yield, year == 2023 & crop == "FC"), aes(x = as.factor(date_collected), y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
 
+#excluding plots without harvest
+ggplot(yield_wk_23_AS, aes(x = week, y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
+ggplot(yield_wk_23_DB, aes(x = week, y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
+ggplot(yield_wk_23_FC, aes(x = week, y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
+```
 
+```{r}
 ggplot(subset(yield, year == 2024 & crop == "AS"), aes(x = as.factor(date_collected), y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
 ggplot(subset(yield, year == 2024 & crop == "DB"), aes(x = as.factor(date_collected), y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
 ggplot(subset(yield, year == 2024 & crop == "FC"), aes(x = as.factor(date_collected), y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
+
+#excluding plots without harvest
+ggplot(yield_wk_24_AS, aes(x = week, y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
+ggplot(yield_wk_24_DB, aes(x = week, y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
+ggplot(yield_wk_24_FC, aes(x = week, y = marketable_g, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45))
+
+```
+
+```{r}
 
 #sampling combined, visualized by crop/treatment for each year
 ggplot(subset(yield, crop == "AS"), aes(x = year, y = marketable_g, fill = treatment)) + geom_boxplot() 
 ggplot(subset(yield, crop == "DB"), aes(x = year, y = marketable_g, fill = treatment)) + geom_boxplot()
 ggplot(subset(yield, crop == "FC"), aes(x = year, y = marketable_g, fill = treatment)) + geom_boxplot()
 
+# excluding plots with 0 g harvest
+ggplot(yield_wk_AS, aes(x = year, y = marketable_g, fill = treatment)) + geom_boxplot() 
+ggplot(yield_wk_DB, aes(x = year, y = marketable_g, fill = treatment)) + geom_boxplot()
+ggplot(yield_wk_FC, aes(x = year, y = marketable_g, fill = treatment)) + geom_boxplot()
+
 #sampling and year combined, visualized by crop/treatment. 
 ggplot(subset(yield, crop == "AS"), aes(x = treatment, y = marketable_g)) + geom_boxplot() 
 ggplot(subset(yield, crop == "DB"), aes(x = treatment, y = marketable_g)) + geom_boxplot()
 ggplot(subset(yield, crop == "FC"), aes(x = treatment, y = marketable_g)) + geom_boxplot()
+
+# excluding plots with 0 g harvest
+ggplot(yield_wk_AS, aes(x = treatment, y = marketable_g)) + geom_boxplot() 
+ggplot(yield_wk_DB, aes(x = treatment, y = marketable_g)) + geom_boxplot()
+ggplot(yield_wk_FC, aes(x = treatment, y = marketable_g)) + geom_boxplot()
 
 ```
 
@@ -2570,10 +380,19 @@ ggplot(subset(yield, crop == "FC"), aes(x = treatment, y = marketable_g)) + geom
 ggplot(subset(yield_wk, year == 2023), aes(x = week, y = per_market, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
 ggplot(subset(yield_wk, year == 2024), aes(x = week, y = per_market, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
 
+#excluding plots with no harvest
+ggplot(subset(yield_wk, year == 2023 & total_g != 0), aes(x = week, y = per_market, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+ggplot(subset(yield_wk, year == 2024 & total_g != 0), aes(x = week, y = per_market, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+
 #sampling combined, visualized by crop/treatment for each year
 ggplot(subset(yield_wk, crop == "AS"), aes(x = year, y = per_market, fill = treatment)) + geom_boxplot() 
 ggplot(subset(yield_wk, crop == "DB"), aes(x = year, y = per_market, fill = treatment)) + geom_boxplot()
 ggplot(subset(yield_wk, crop == "FC"), aes(x = year, y = per_market, fill = treatment)) + geom_boxplot()
+
+#excluding plots with no harvest
+ggplot(yield_wk_AS, aes(x = year, y = per_market, fill = treatment)) + geom_boxplot() 
+ggplot(yield_wk_DB, aes(x = year, y = per_market, fill = treatment)) + geom_boxplot()
+ggplot(yield_wk_FC, aes(x = year, y = per_market, fill = treatment)) + geom_boxplot()
 
 #sampling and year combined, visualized by crop/treatment. 
 ggplot(subset(yield_wk, crop == "AS"), aes(x = treatment, y = per_market)) + geom_boxplot() 
@@ -2606,10 +425,19 @@ ggplot(subset(yield, crop == "FC"), aes(x = treatment, y = unmarketable_g)) + ge
 ggplot(subset(yield, year == 2023), aes(x = as.factor(date_collected), y = total_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
 ggplot(subset(yield, year == 2024), aes(x = as.factor(date_collected), y = total_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
 
+#excluding plots with 0g harvest
+ggplot(subset(yield, year == 2023 & total_g != 0), aes(x = as.factor(date_collected), y = total_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+ggplot(subset(yield, year == 2024 & total_g != 0), aes(x = as.factor(date_collected), y = total_g, fill = treatment)) + geom_boxplot() + facet_wrap(~crop)
+
 #sampling combined, visualized by crop/treatment for each year
 ggplot(subset(yield, crop == "AS"), aes(x = year, y = total_g, fill = treatment)) + geom_boxplot() 
 ggplot(subset(yield, crop == "DB"), aes(x = year, y = total_g, fill = treatment)) + geom_boxplot()
 ggplot(subset(yield, crop == "FC"), aes(x = year, y = total_g, fill = treatment)) + geom_boxplot()
+
+#excluding weeks with 0 g 
+ggplot(yield_wk_AS, aes(x = year, y = total_g, fill = treatment)) + geom_boxplot() 
+ggplot(yield_wk_DB, aes(x = year, y = total_g, fill = treatment)) + geom_boxplot()
+ggplot(yield_wk_FC, aes(x = year, y = total_g, fill = treatment)) + geom_boxplot()
 
 #sampling and year combined, visualized by crop/treatment. 
 ggplot(subset(yield, crop == "AS"), aes(x = treatment, y = total_g)) + geom_boxplot() 
@@ -4159,45 +1987,6 @@ ggplot(yield_yr_FC, aes(x = treatment, y = total_g)) + geom_boxplot()
 
 ```
 
-```{r}
-# There is not a significant difference in total collard yield across both years
-aov <- aov(total_g ~ treatment, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(total_g ~ treatment, data = yield_yr_FC)
-
-# There is a significant difference between years for total yield
-aov <- aov(total_g ~ year, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(total_g ~ year, data = yield_yr_FC)
-
-# Checking for interactions - there are none
-aov <- aov(total_g ~ treatment*year, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-# There was not a significant difference between mulch treatments for collard total yield in 2023 or 2024
-aov <- aov(total_g ~ treatment, data = subset(yield_yr_FC, year == "2023"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(total_g ~ treatment, data = subset(yield_yr_FC, year == "2023"))
-
-aov <- aov(total_g ~ treatment, data = subset(yield_yr_FC, year == "2024"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(total_g ~ treatment, data = subset(yield_yr_FC, year == "2024"))
-
-```
 
 
 Overall
@@ -4374,7 +2163,14 @@ Most relevant visual for my analysis thus far
 ```{r}
 
 #sampling combined, visualized by crop/treatment for each year
-ggplot(spad, aes(x = crop, y = value, fill = treatment)) + geom_boxplot() + facet_wrap(~year)
+ggplot(spad_AS, aes(x = as.factor(date_collected), y = value, fill = treatment)) + geom_boxplot()  + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(spad_DB, aes(x = as.factor(date_collected), y = value, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(spad_FC, aes(x = as.factor(date_collected), y = value, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#checking whether outliers make a difference in trends. Visually, it does not change trends - just, like, decreased amplitude, especially for collards. However, medians appear to generally stay the same regardless of whether outliers are excluded or included
+ggplot(spad_AS_out, aes(x = as.factor(date_collected), y = value, fill = treatment)) + geom_boxplot()  + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(spad_DB_out, aes(x = as.factor(date_collected), y = value, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(spad_FC_out, aes(x = as.factor(date_collected), y = value, fill = treatment)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -4447,38 +2243,39 @@ kruskal.test(value ~ treatment, data = subset(spad, crop == "DB" & year == "2024
 
 #### Strawberries
 
-##### ANOVA & KW
+##### Overall
+There are significant differences between years and treatments, and interactions, which I'm less sure how to think through. 
 ```{r}
-#Across the whole data set, there is an interaction between treatment and year, so will analyze years separately
+#While the dataset is not normally distributed according to the Shapiro-Wilk, it does look like it meets model assumptions here. Across the whole data set, there is an interaction between treatment and year, and both treatment and year are significantly different
 aov <- aov(value ~ treatment*year, data = spad_AS)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-# In 2023, bare soil was significantly different from straw and cardboard. I find the same results using KW with the df that includes potential outliers 
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2023"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
+# If we try an LMM, we see the same results as the ANOVA, but the SM-CM difference is now significant
+model <- lmer(value ~ treatment*year + (1 | block), data = spad_AS)
+AIC(model)
+summary(model)
 
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2023"))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2023"))
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
 
-# In 2024, there was not a significant difference between treatments, regardless of whether I ran the ANOVA/no-outliers or KW/with outliers. 
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2024"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
+#generate qqplot
+plot(re)
 
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2024"))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2024"))
-```
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 
-##### Linear Mixed Models
+#ranked likelihood test
+ranova(model)
 
-rANOVA indicates that block is a significant random effect (p = 0.006) for 2023. emmeans shows that bare soil is significantly different from cardboard mulch (p = 0.001) and straw mulch (p = 0.05)
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2023"))
+emmeans(model, pairwise ~ treatment)
+
+
+# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - and year is no longer a significant predictor, though there are some interaction effects that I don't think I'm really interested in
+model <- lmer(value ~ treatment*year + (1 | date_collected/block), data = spad_AS)
 AIC(model)
 summary(model)
 
@@ -4498,36 +2295,483 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 ```
+
+Now that we see that year isn't a great fixed effect when we use date_collected as a random effect, then we actually get the highest quality model that really shows the difference between CM and BM/SM
+
+```{r}
+# I could still include year here, technically, because it contributes treatment:year interactions, but year itself doesn't have a significant impact
+model <- lmer(bc_value ~ treatment + (1 | date_collected/block), data = spad_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# KW test finds similar difference between treatments, though the CM-SM isn't significant
+kruskal.test(value ~ treatment, data = spad_AS)
+dunnTest(value ~ treatment, data = spad_AS)
+
+```
+
+
+If I repeat these tests with the dataframe including outliers, it does not substantively change the results. It does show a larger difference between CM and bare soil, though I don't think that best represents the data
+```{r}
+
+#LMM
+model <- lmer(value ~ treatment + (1 | date_collected/block), data = spad_AS_out)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+#KW
+kruskal.test(value ~ treatment, data = spad_AS_out)
+dunnTest(value ~ treatment, data = spad_AS_out)
+```
+
+##### 2023 only
+```{r}
+# In 2023, bare soil was significantly different from straw and cardboard. 
+aov <- aov(value ~ treatment, data = spad_23_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+aov <- aov(bc_value ~ treatment, data = spad_23_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(value ~ treatment, data = spad_23_AS)
+dunnTest(value ~ treatment, data = spad_23_AS)
+```
+
+```{r}
+# rANOVA indicates that block is a significant random effect (p = 0.006) for 2023. emmeans shows that bare soil is significantly different from cardboard mulch (p = 0.001) and nearly straw mulch (p = 0.05)
+model <- lmer(value ~ treatment + (1 | block), data = spad_23_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# repeating with the transformed dataset
+model <- lmer(bc_value ~ treatment + (1 | block), data = spad_23_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+```
+
+Sampling is significant as a random effect in 2023, and using the transformed dataset allows us to see a significant difference between bare soil and straw mulch, in addition to BM-CM.
+
+```{r}
+#LMM with original dataset
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_23_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+#LMM with transformed dataset
+model <- lmer(bc_value ~ treatment + (1 | date_collected), data = spad_23_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+```{r}
+#LMM with original dataset
+model <- lmer(value ~ treatment + (1 | date_collected/block), data = spad_23_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+#LMM with transformed dataset
+model <- lmer(bc_value ~ treatment + (1 | date_collected/block), data = spad_23_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+#LMM with transformed dataset, including outliers
+model <- lmer(bc_value ~ treatment + (1 | date_collected/block), data = spad_23_AS_out)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+###### Sampling Point 1
+No differences between treatments
+```{r}
+
+# ANOVA (tried with the untransformed data as well, same overall results). 
+aov <- aov(bc_value ~ treatment, data = subset(spad_23_AS, sampling == 1))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Using the dataset with outliers does not change the result
+kruskal.test(value ~ treatment, data = subset(spad_23_AS, sampling == 1))
+dunnTest(value ~ treatment, data = subset(spad_23_AS, sampling == 1))
+
+#LMM - block is not a significant random effect
+model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_23_AS,sampling == 1))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 2
+
+```{r}
+
+# ANOVA bare soil is significantly different from cardboard and straw. Including outliers does not substantively change the result
+aov <- aov(bc_value ~ treatment, data = subset(spad_23_AS, sampling == 2))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# KW. Including outliers does not substantively change the result
+kruskal.test(value ~ treatment, data = subset(spad_23_AS, sampling == 2))
+dunnTest(value ~ treatment, data = subset(spad_23_AS, sampling == 2))
+
+# LMM: Including outliers does not substantively change the result
+model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_23_AS_out, sampling == 2))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+```
+
+
+###### Sampling Point 3
+
+```{r}
+
+# ANOVA: cardboard is significantly different from bare soil and straw. Including outliers doesn't substantively change the result. Interesting, it does decrease the AIC
+aov <- aov(bc_value ~ treatment, data = subset(spad_23_AS_out, sampling == 3))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Including outliers doesn't substantively change the result. 
+kruskal.test(value ~ treatment, data = subset(spad_23_AS, sampling == 3))
+dunnTest(value ~ treatment, data = subset(spad_23_AS, sampling == 3))
+
+#LMM. Including outliers doesn't substantively change the result. 
+model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_23_AS_out, sampling == 3))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+```
+
+
+###### Sampling Point 4
+
+```{r}
+
+# ANOVA: cardboard is significantly different from bare soil (and nearly so from straw). Including outliers does not substantively change the results
+aov <- aov(bc_value ~ treatment, data = subset(spad_23_AS, sampling == 4))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_AS, sampling == 4))
+dunnTest(value ~ treatment, data = subset(spad_23_AS, sampling == 4))
+
+
+#LMM: Including outliers does not substantively change the results
+model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_23_AS, sampling == 4))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 5
+
+```{r}
+
+# ANOVA:  no significant difference between treatments. Including outliers does not substantively change the results
+aov <- aov(bc_value ~ treatment, data = subset(spad_23_AS, sampling == 5))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_AS, sampling == 5))
+dunnTest(value ~ treatment, data = subset(spad_23_AS, sampling == 5))
+
+#LMM: Including outliers does not substantively change the results
+model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_23_AS, sampling == 5))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 6
+
+```{r}
+
+# ANOVA:  straw mulch is significantly different from cardboard and nearly from bare soil. It outliers are included, the differences become significant
+aov <- aov(bc_value ~ treatment, data = subset(spad_23_AS, sampling == 6))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_AS, sampling == 6))
+dunnTest(value ~ treatment, data = subset(spad_23_AS, sampling == 6))
+
+#LMM: isSingular error
+model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_23_AS, sampling == 6))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+##### 2024 only
+```{r}
+# In 2024, there was not a significant difference between treatments. Running it with outliers included does not substantively change the results (though the dataset definitely does NOT meet ANOVA model assumptions) 
+aov <- aov(value ~ treatment, data = spad_24_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(value ~ treatment, data = spad_24_AS)
+dunnTest(value ~ treatment, data = spad_24_AS)
+```
+
 
 Block is not a significant random effect for 2024
 ```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2024"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-##### Should I look at sampling?
-
-Sampling is significant as a random effect in 2023
-
-```{r}
-model <- lmer(value ~ treatment + (1 | sampling), data = subset(spad_AS, year == "2023"))
+model <- lmer(value ~ treatment + (1 | block), data = spad_24_AS)
 AIC(model)
 summary(model)
 
@@ -4550,29 +2794,7 @@ emmeans(model, pairwise ~ treatment)
 
 
 ```{r}
-model <- lmer(value ~ treatment + (1 | sampling/block), data = subset(spad_AS, year == "2023"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-```{r}
-model <- lmer(value ~ treatment + (1 | sampling), data = subset(spad_AS, year == "2024"))
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_24_AS)
 AIC(model)
 summary(model)
 
@@ -4595,7 +2817,7 @@ emmeans(model, pairwise ~ treatment)
 
 
 ```{r}
-model <- lmer(value ~ treatment + (1 | sampling/block), data = subset(spad_AS, year == "2024"))
+model <- lmer(bc_value ~ treatment + (1 | sampling/block), data = spad_24_AS)
 AIC(model)
 summary(model)
 
@@ -4617,31 +2839,24 @@ emmeans(model, pairwise ~ treatment)
 ```
 
 
-##### Sampling Point 1
 
+###### Sampling Point 1
+
+straw was significantly different from bare soil and cardboard
 ```{r}
-
-# 2023: no significant differences between treatments 
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2023" & sampling == 1))
+# ANOVA: straw was significantly different from bare soil and cardboard
+aov <- aov(value ~ treatment, data = subset(spad_24_AS, sampling == 1))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot()
 
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 1))
+#KW. Including outliers does not substantively change the result
+kruskal.test(value ~ treatment, data = subset(spad_24_AS, sampling == 1))
+dunnTest(value ~ treatment, data = subset(spad_24_AS, sampling == 1))
 
-# 2024: straw was significantly different from bare soil and cardboard
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2024" & sampling == 1))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 1))
-```
-2023: no significant differences between treatments 
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2023" & sampling == 1))
+#LMM
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_AS, sampling == 1))
 AIC(model)
 summary(model)
 
@@ -4662,79 +2877,23 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-2024: straw was significantly different from bare soil and cardboard
+###### Sampling Point 2
+
+cardboard is significantly different from bare soil and straw
 ```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2024" & sampling == 1))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-##### Sampling Point 2
-
-```{r}
-
-# 2023: bare soil is significantly different from bare soil and straw 
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2023" & sampling == 2))
+# ANOVA: cardboard was significantly different from bare soil and straw
+aov <- aov(value ~ treatment, data = subset(spad_24_AS, sampling == 2))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 2))
+#KW: Including outliers does not substantively change the result
+kruskal.test(value ~ treatment, data = subset(spad_24_AS, sampling == 2))
+dunnTest(value ~ treatment, data = subset(spad_24_AS_out, sampling == 2))
 
-# 2024: cardboard was significantly different from bare soil and straw
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2024" & sampling == 2))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 2))
-```
-
-
-2023: bare soil is significantly different from cardboard and straw
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2023" & sampling == 2))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-2024: cardboard is significantly different from bare soil and straw
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2024" & sampling == 2))
+#LMM
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_AS, sampling == 2))
 AIC(model)
 summary(model)
 
@@ -4756,33 +2915,24 @@ emmeans(model, pairwise ~ treatment)
 ```
 
 
-##### Sampling Point 3
+###### Sampling Point 3
 
+no significant difference between treatments
 ```{r}
 
-# 2023: cardboard is significantly different from bare soil and straw
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2023" & sampling == 3))
+# ANOVA: no significant differences between treatments
+aov <- aov(value ~ treatment, data = subset(spad_24_AS, sampling == 3))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 3))
+#KW: including outliers does not change result
+kruskal.test(value ~ treatment, data = subset(spad_24_AS, sampling == 3))
+dunnTest(value ~ treatment, data = subset(spad_24_AS, sampling == 3))
 
-# 2024: no significant differences between treatments
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2024" & sampling == 3))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 3))
-```
-
-
-2023: cardboard is significantly different from straw and bare soil
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2023" & sampling == 3))
+#LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_AS, sampling == 3))
 AIC(model)
 summary(model)
 
@@ -4803,79 +2953,24 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-2024: no significant difference between treatments
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2024" & sampling == 3))
-AIC(model)
-summary(model)
+###### Sampling Point 4
 
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-##### Sampling Point 4
-
+no significant difference between treatments
 ```{r}
 
-# 2023: cardboard is significantly different from bare soil 
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2023" & sampling == 4))
+# ANOVA: no significant differences between treatments
+aov <- aov(value ~ treatment, data = subset(spad_24_AS, sampling == 4))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 4))
+#KW
+kruskal.test(value ~ treatment, data = subset(spad_24_AS, sampling == 4))
+dunnTest(value ~ treatment, data = subset(spad_24_AS, sampling == 4))
 
-# 2024: no significant differences between treatments
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2024" & sampling == 4))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 4))
-```
-
-
-2023: cardboard is significantly different from straw and bare soil
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2023" & sampling == 4))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-2024: no significant difference between treatments
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2024" & sampling == 4))
+#LMM
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_AS, sampling == 4))
 AIC(model)
 summary(model)
 
@@ -4897,97 +2992,23 @@ emmeans(model, pairwise ~ treatment)
 ```
 
 
-##### Sampling Point 5
+###### Sampling Point 5
 
 ```{r}
 
-# 2023:  no significant difference between treatments
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2023" & sampling == 5))
+# ANOVA: 
+aov <- aov(value ~ treatment, data = subset(spad_24_AS, sampling == 5))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 5))
+#kw
+kruskal.test(value ~ treatment, data = subset(spad_24_AS, sampling == 5))
+dunnTest(value ~ treatment, data = subset(spad_24_AS, sampling == 5))
 
-# 2024: 
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2024" & sampling == 5))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2024" & sampling == 5))
-```
-
-
-2023: no significant difference between treatments
-The data here is not normally distributed
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2023" & sampling == 5))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-2024: 
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2024" & sampling == 5))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-##### Sampling Point 6
-
-```{r}
-
-# 2023:  straw mulch is significantly different from cardboard 
-aov <- aov(value ~ treatment, data = subset(spad_AS, year == "2023" & sampling == 6))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 6))
-dunnTest(value ~ treatment, data = subset(spad_AS_out, year == "2023" & sampling == 6))
-
-```
-
-
-2023: no significant difference between treatments
-The data here is not normally distributed
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_AS, year == "2023" & sampling == 6))
+#LMM
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_AS, sampling == 5))
 AIC(model)
 summary(model)
 
@@ -5011,38 +3032,39 @@ emmeans(model, pairwise ~ treatment)
 
 #### Beans
 
-##### ANOVA & KW
+##### Overall
+
 ```{r}
-#Across the whole data set, there is an interaction between treatment and year, so will analyze years separately
+#While the dataset is not normally distributed according to the Shapiro-Wilk, it does look like it meets model assumptions here, at least in the way these often do
 aov <- aov(value ~ treatment*year, data = spad_DB)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-# In 2023, there were no significant differences between treatments
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2023"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
+# If we try an LMM, SM and CM are still sig different. Doesn't seem to meet model assumptions
+model <- lmer(value ~ treatment*year + (1 | block), data = spad_DB)
+AIC(model)
+summary(model)
 
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2023"))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2023"))
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
 
-# In 2024, straw and cardboard were significantly different
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2024"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
+#generate qqplot
+plot(re)
 
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2024"))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2024"))
-```
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 
-##### Linear Mixed Models
+#ranked likelihood test
+ranova(model)
 
-rANOVA indicates that block is a significant random effect (p = 0.02) for 2023. No significant difference between treatments
-```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2023"))
+emmeans(model, pairwise ~ treatment)
+
+
+# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - and year is no longer a significant predictor, though there are some interaction effects that I don't think I'm really interested in
+model <- lmer(value ~ treatment*year + (1 | date_collected/block), data = spad_DB)
 AIC(model)
 summary(model)
 
@@ -5062,10 +3084,374 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 ```
+
+Checking to see what the model quality is if year is removed, and it has a higher AIC.
+
+```{r}
+# I could still include year here, technically, because it contributes treatment:year interactions, but year itself doesn't have a significant impact
+model <- lmer(bc_value ~ treatment + (1 | date_collected/block), data = spad_DB)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# KW test finds similar difference between treatments, though the CM-SM isn't significant. 
+kruskal.test(value ~ treatment, data = spad_DB)
+dunnTest(value ~ treatment, data = spad_DB)
+
+# KW test affirms the difference between years, though.
+kruskal.test(value ~ year, data = spad_DB)
+
+```
+
+##### 2023 only
+```{r}
+# ANOVA: no differences, iffy whether model assumptions are met
+aov <- aov(value ~ treatment, data = spad_23_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# KW: no differences. I also ran this with outliers included, and it didn't substantially change the results
+kruskal.test(value ~ treatment, data = spad_23_DB)
+
+# LMM: no differences, block is a significant RE
+model <- lmer(value ~ treatment + (1 | block), data = spad_23_DB)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+```
+
+
+Sampling is significant as a random effect in 2023, but there are still no differences between treatments 
+
+```{r}
+#LMM: date_collected is a significant RE, but still no differences between treatments
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_23_DB)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+#LMM with both RE's - both significant. I also ran this with outliers included, and it didn't substantially change the results
+model <- lmer(value ~ treatment + (1 | date_collected/block), data = spad_23_DB)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 1
+CM is significantly higher than bare soil
+```{r}
+
+# ANOVA:
+aov <- aov(value ~ treatment, data = subset(spad_23_DB, sampling == 1))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Using the dataset with outliers does not change the result
+kruskal.test(value ~ treatment, data = subset(spad_23_DB, sampling == 1))
+dunnTest(value ~ treatment, data = subset(spad_23_DB, sampling == 1))
+
+#LMM:
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_DB,sampling == 1))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 2
+
+```{r}
+
+# ANOVA 
+aov <- aov(value ~ treatment, data = subset(spad_23_DB, sampling == 2))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# KW. Including outliers does not substantively change the result
+kruskal.test(value ~ treatment, data = subset(spad_23_DB, sampling == 2))
+
+# LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_DB, sampling == 2))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+```
+
+
+###### Sampling Point 3
+
+```{r}
+
+# ANOVA: 
+aov <- aov(value ~ treatment, data = subset(spad_23_DB, sampling == 3))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Including outliers doesn't substantively change the result. 
+kruskal.test(value ~ treatment, data = subset(spad_23_DB, sampling == 3))
+dunnTest(value ~ treatment, data = subset(spad_23_DB, sampling == 3))
+
+#LMM. 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_DB, sampling == 3))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+```
+
+
+###### Sampling Point 4
+
+```{r}
+
+# ANOVA: 
+aov <- aov(value ~ treatment, data = subset(spad_23_DB, sampling == 4))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_DB, sampling == 4))
+dunnTest(value ~ treatment, data = subset(spad_23_DB, sampling == 4))
+
+
+#LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_DB, sampling == 4))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 5
+
+```{r}
+
+# ANOVA:  
+aov <- aov(value ~ treatment, data = subset(spad_23_DB, sampling == 5))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_DB, sampling == 5))
+dunnTest(value ~ treatment, data = subset(spad_23_DB, sampling == 5))
+
+#LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_DB, sampling == 5))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 6
+
+```{r}
+
+# ANOVA:  
+aov <- aov(value ~ treatment, data = subset(spad_23_DB, sampling == 6))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_DB, sampling == 6))
+dunnTest(value ~ treatment, data = subset(spad_23_DB, sampling == 6))
+
+#LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_DB, sampling == 6))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+
+##### 2024 only
+```{r}
+# Both show that straw and cardboard are significantly different
+
+# ANOVA
+aov <- aov(value ~ treatment, data = spad_24_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. I also tried including the outliers, and it doesn't change the result 
+kruskal.test(value ~ treatment, data = spad_24_DB)
+dunnTest(value ~ treatment, data = spad_24_DB_out)
+
+
+```
+
 
 Block is not a significant random effect for 2024
 ```{r}
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2024"))
+# LMM: isSingular error
+model <- lmer(value ~ treatment + (1 | block), data = spad_24_DB)
 AIC(model)
 summary(model)
 
@@ -5084,14 +3470,8 @@ ranova(model)
 
 emmeans(model, pairwise ~ treatment)
 
-```
-
-##### Should I look at sampling?
-
-Sampling is significant as a random effect in 2023
-
-```{r}
-model <- lmer(value ~ treatment + (1 | sampling), data = subset(spad_DB, year == "2023"))
+# LMM: date_collected is a significant RE. We also start to see a potential difference between bare soil and cardboard mulch
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_24_DB)
 AIC(model)
 summary(model)
 
@@ -5110,33 +3490,8 @@ ranova(model)
 
 emmeans(model, pairwise ~ treatment)
 
-```
-
-
-```{r}
-model <- lmer(value ~ treatment + (1 | sampling/block), data = subset(spad_DB, year == "2023"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-```{r}
-model <- lmer(value ~ treatment + (1 | sampling), data = subset(spad_DB, year == "2024"))
+# LMM: Difference between bare soil and cardboard mulch still nearly significant. BUT, including outliers DOES change the results: difference between BM-CM disappers and instead there's a difference between BM and SM, which seems more likely
+model <- lmer(value ~ treatment + (1 | sampling/block), data = spad_24_DB_out)
 AIC(model)
 summary(model)
 
@@ -5158,80 +3513,24 @@ emmeans(model, pairwise ~ treatment)
 ```
 
 
-```{r}
-model <- lmer(value ~ treatment + (1 | sampling/block), data = subset(spad_DB, year == "2024"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-##### Sampling Point 1
-
-2023: cardboard is significantly different from bare soil
-```{r}
-
-#ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2023" & sampling == 1))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 1))
-
-#LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2023" & sampling == 1))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
+###### Sampling Point 1
 
 2024: cardboard is significantly different from bare soil and straw mulch
 ```{r}
 
 # ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2024" & sampling == 1))
+aov <- aov(value ~ treatment, data = subset(spad_24_DB, sampling == 1))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 1))
+#KW. Including outliers does not change results
+kruskal.test(value ~ treatment, data = subset(spad_24_DB, sampling == 1))
+dunnTest(value ~ treatment, data = subset(spad_24_DB, sampling == 1))
 
 #LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2024" & sampling == 1))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_DB, sampling == 1))
 AIC(model)
 summary(model)
 
@@ -5252,23 +3551,24 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-##### Sampling Point 2
+###### Sampling Point 2
 
-2023: no significant difference between treatments
+no significant difference between treatments
 ```{r}
 
 #ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2023" & sampling == 2))
+aov <- aov(value ~ treatment, data = subset(spad_24_DB, sampling == 2))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 2))
+#KW: including outliers doesn't change the result
+kruskal.test(value ~ treatment, data = subset(spad_24_DB, sampling == 2))
+dunnTest(value ~ treatment, data = subset(spad_24_DB, sampling == 2))
 
 #LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2023" & sampling == 2))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_DB, sampling == 2))
 AIC(model)
 summary(model)
 
@@ -5289,21 +3589,24 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-2024: no significant difference between treatments
+###### Sampling Point 3
+
+no significant difference between treatments
 ```{r}
 
 # ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2024" & sampling == 2))
+aov <- aov(value ~ treatment, data = subset(spad_24_DB, sampling == 3))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 2))
+#KW: Including outliers does not changethe result
+kruskal.test(value ~ treatment, data = subset(spad_24_DB, sampling == 3))
+dunnTest(value ~ treatment, data = subset(spad_24_DB_out, sampling == 3))
 
 #LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2024" & sampling == 2))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_DB, sampling == 3))
 AIC(model)
 summary(model)
 
@@ -5323,129 +3626,25 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 ```
-##### Sampling Point 3
+###### Sampling Point 4
 
-2023: no difference between treatments
-```{r}
-
-#ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2023" & sampling == 3))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 3))
-
-#LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2023" & sampling == 3))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-2024: no significant difference between treatments
-```{r}
-
-# ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2024" & sampling == 3))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 3))
-
-#LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2024" & sampling == 3))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-##### Sampling Point 4
-
-2023: no significant difference between treatments
-```{r}
-
-#ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2023" & sampling == 4))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 4))
-
-#LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2023" & sampling == 4))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
 
 2024: SM is significantly different from CM and BM according to ANOVA, but not KW
 ```{r}
 
 # ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2024" & sampling == 4))
+aov <- aov(value ~ treatment, data = subset(spad_24_DB, sampling == 4))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 4))
+#KW: including outliers decreases the significant, making straw only nealry significant with bare soil
+kruskal.test(value ~ treatment, data = subset(spad_24_DB, sampling == 4))
+dunnTest(value ~ treatment, data = subset(spad_24_DB, sampling == 4))
 
 #LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2024" & sampling == 4))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_DB, sampling == 4))
 AIC(model)
 summary(model)
 
@@ -5466,58 +3665,24 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-##### Sampling Point 5
+###### Sampling Point 5
 
-2023: Bare soil is significantly different from CM according to LMM. ANOVA and KW show no differences between treatments
-```{r}
-
-#ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2023" & sampling == 5))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 5))
-
-#LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2023" & sampling == 5))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-2024: SM is significantly different from cardboard according to ANOVA and LMM, but not KW.
+2024: very conflicted
 ```{r}
 
 # ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2024" & sampling == 5))
+aov <- aov(value ~ treatment, data = subset(spad_24_DB, sampling == 5))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2024" & sampling == 5))
+#KW: Including outliers means there is absolutely no difference between treatments
+kruskal.test(value ~ treatment, data = subset(spad_24_DB, sampling == 5))
+dunnTest(value ~ treatment, data = subset(spad_, sampling == 5))
 
 #LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2024" & sampling == 5))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_DB, sampling == 5))
 AIC(model)
 summary(model)
 
@@ -5537,53 +3702,10 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 ```
-##### Sampling Point 6
-
-2023: ANOVA and LMM show no signficant difference between treatments. KW shows a barely significant relationship between bare soil and cardboard
-```{r}
-
-#ANOVA
-aov <- aov(value ~ treatment, data = subset(spad_DB, year == "2023" & sampling == 6))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 6))
-dunnTest(value ~ treatment, data = subset(spad_DB_out, year == "2023" & sampling == 6))
-
-#LMM
-model <- lmer(value ~ treatment + (1 | block), data = subset(spad_DB, year == "2023" & sampling == 6))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
 
 ### Collards
 
-#### ANOVA & KW
 ```{r}
-#Across the whole data set, years are significantly different
-aov <- aov(bc_value ~ treatment*year, data = spad_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
 
 # In 2023, there were no significant differences between treatments. This finding is the same for ANOVA/transformed; no-outliers, KW/untransformed, no-outliers; KW/untransformed, with outliers
 aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023"))
@@ -5610,169 +3732,149 @@ kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2024"))
 dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2024"))
 ```
 
-#### Linear Mixed Models
 
-rANOVA indicates that block is not significant. There are no differences between treatment.
-```{r}
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2023"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-Block is not a significant random effect for 2024
-```{r}
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2024"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-
-```
-
-
-#### Should I look at sampling?
+##### Overall
 
 ```{r}
-model <- lmer(bc_value ~ treatment + (1 | sampling), data = subset(spad_FC, year == "2023"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-
-```{r}
-model <- lmer(bc_value ~ treatment + (1 | sampling/block), data = subset(spad_FC, year == "2023"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-```{r}
-model <- lmer(bc_value ~ treatment + (1 | sampling), data = subset(spad_FC, year == "2024"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-
-```{r}
-model <- lmer(bc_value ~ treatment + (1 | sampling/block), data = subset(spad_FC, year == "2024"))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-
-#### Sampling Point 1
-
-2023: no difference between treatments
-```{r}
-
-#ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 1))
+# only a difference between years. 
+aov <- aov(value ~ treatment*year, data = spad_FC)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 1))
+# only a difference between years. Block is not a significant random effect
+model <- lmer(value ~ treatment*year + (1 | block), data = spad_FC)
+AIC(model)
+summary(model)
 
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 1))
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
 
-#LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2023" & sampling == 1))
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - and year is no longer a significant predictor, though there are some interaction effects that I don't think I'm really interested in
+model <- lmer(value ~ treatment*year + (1 | date_collected/block), data = spad_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ year)
+
+```
+
+
+
+```{r}
+# I could still include year here, technically, because it contributes treatment:year interactions, but year itself doesn't have a significant impact
+model <- lmer(value ~ treatment + (1 | date_collected/block), data = spad_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# KW no differences between treatments. Including outliers does not change results 
+kruskal.test(value ~ treatment, data = spad_FC)
+dunnTest(value ~ treatment, data = spad_FC)
+
+# KW test affirms the difference between years, though.
+kruskal.test(value ~ year, data = spad_FC)
+
+```
+
+##### 2023 only
+```{r}
+# ANOVA: no differences
+aov <- aov(value ~ treatment, data = spad_23_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# KW:  no differences. I also ran this with outliers included, and it didn't substantially change the results
+kruskal.test(value ~ treatment, data = spad_23_FC_out)
+
+# LMM: no differences. block is not a significant RE
+model <- lmer(value ~ treatment + (1 | block), data = spad_23_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+```
+
+```{r}
+#LMM: no differences. sampling is a significant randome effect
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_23_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+#LMM with both RE's - only date is significant. I also ran this with outliers included, and it didn't substantially change the results
+model <- lmer(value ~ treatment + (1 | date_collected/block), data = spad_23_FC)
 AIC(model)
 summary(model)
 
@@ -5793,24 +3895,336 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-2024: SM and CM are significantly different according to the ANOVA, LMM, and the KW with outliers removed, but not the KW for the original data
+###### Sampling Point 1
+
+```{r}
+
+# ANOVA:
+aov <- aov(value ~ treatment, data = subset(spad_23_FC, sampling == 1))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Using the dataset with outliers does not change the result
+kruskal.test(value ~ treatment, data = subset(spad_23_FC, sampling == 1))
+dunnTest(value ~ treatment, data = subset(spad_23_FC, sampling == 1))
+
+#LMM: block is not a significant RE
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_FC,sampling == 1))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 2
+
+```{r}
+
+# ANOVA 
+aov <- aov(value ~ treatment, data = subset(spad_23_FC, sampling == 2))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# KW. Including outliers does not substantively change the result
+kruskal.test(value ~ treatment, data = subset(spad_23_FC, sampling == 2))
+
+# LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_FC, sampling == 2))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+```
+
+
+###### Sampling Point 3
+
+```{r}
+
+# ANOVA: 
+aov <- aov(value ~ treatment, data = subset(spad_23_FC, sampling == 3))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Including outliers doesn't substantively change the result. 
+kruskal.test(value ~ treatment, data = subset(spad_23_FC, sampling == 3))
+dunnTest(value ~ treatment, data = subset(spad_23_FC, sampling == 3))
+
+#LMM. 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_FC, sampling == 3))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+```
+
+
+###### Sampling Point 4
+
+```{r}
+
+# ANOVA: 
+aov <- aov(value ~ treatment, data = subset(spad_23_FC, sampling == 4))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_FC, sampling == 4))
+dunnTest(value ~ treatment, data = subset(spad_23_FC, sampling == 4))
+
+
+#LMM: block is not a significant RE
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_FC, sampling == 4))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 5
+
+```{r}
+
+# ANOVA:  
+aov <- aov(value ~ treatment, data = subset(spad_23_FC, sampling == 5))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_FC, sampling == 5))
+dunnTest(value ~ treatment, data = subset(spad_23_FC, sampling == 5))
+
+#LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_FC, sampling == 5))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 6
+
+```{r}
+
+# ANOVA:  
+aov <- aov(value ~ treatment, data = subset(spad_23_FC, sampling == 6))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW: Including outliers does not substantively change the results
+kruskal.test(value ~ treatment, data = subset(spad_23_FC, sampling == 6))
+dunnTest(value ~ treatment, data = subset(spad_23_FC, sampling == 6))
+
+#LMM: 
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_23_FC, sampling == 6))
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+
+
+##### 2024 only
+```{r}
+
+# ANOVA: no differences
+aov <- aov(value ~ treatment, data = spad_24_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#KW. no differences. I also tried including the outliers, and it doesn't change the result 
+kruskal.test(value ~ treatment, data = spad_24_FC)
+dunnTest(value ~ treatment, data = spad_24_FC_out)
+
+
+```
+
+```{r}
+# LMM: isSingular error
+model <- lmer(value ~ treatment + (1 | block), data = spad_24_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# LMM: no differences. date_collected is a significant RE. 
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_24_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# LMM: 
+model <- lmer(value ~ treatment + (1 | sampling/block), data = spad_24_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+
+###### Sampling Point 1
+
 ```{r}
 
 # ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 1))
+aov <- aov(value ~ treatment, data = subset(spad_24_FC, sampling == 1))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 1))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 1))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 1))
+#KW. When outliers are included, there is no significant difference between treatments
+kruskal.test(value ~ treatment, data = subset(spad_24_FC, sampling == 1))
+dunnTest(value ~ treatment, data = subset(spad_24_FC, sampling == 1))
 
 #LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2024" & sampling == 1))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_FC, sampling == 1))
 AIC(model)
 summary(model)
 
@@ -5831,26 +4245,23 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-#### Sampling Point 2
+###### Sampling Point 2
 
-2023: no significant difference between treatments
 ```{r}
 
 #ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 2))
+aov <- aov(value ~ treatment, data = subset(spad_24_FC, sampling == 2))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 2))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 2))
+#KW: including outliers doesn't change the result
+kruskal.test(value ~ treatment, data = subset(spad_24_FC, sampling == 2))
+dunnTest(value ~ treatment, data = subset(spad_24_FC, sampling == 2))
 
 #LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2023" & sampling == 2))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_FC, sampling == 2))
 AIC(model)
 summary(model)
 
@@ -5871,24 +4282,23 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-2024: no significant difference between treatments
+###### Sampling Point 3
+
 ```{r}
 
 # ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 2))
+aov <- aov(value ~ treatment, data = subset(spad_24_FC, sampling == 3))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 2))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 2))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 2))
+#KW: Including outliers does not changethe result
+kruskal.test(value ~ treatment, data = subset(spad_24_FC, sampling == 3))
+dunnTest(value ~ treatment, data = subset(spad_24_FC, sampling == 3))
 
 #LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2024" & sampling == 2))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_FC, sampling == 3))
 AIC(model)
 summary(model)
 
@@ -5908,103 +4318,23 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 ```
-##### Sampling Point 3
+###### Sampling Point 4
 
-2023: CM is significantly different from straw and bare soil
-```{r}
-
-#ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 3))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 3))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 3))
-
-#LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2023" & sampling == 3))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-2024: no significant difference between treatments
 ```{r}
 
 # ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 3))
+aov <- aov(value ~ treatment, data = subset(spad_24_FC, sampling == 4))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 3))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 3))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 3))
+#KW: including outliers decreases the significant, making straw only nealry significant with bare soil
+kruskal.test(value ~ treatment, data = subset(spad_24_FC, sampling == 4))
+dunnTest(value ~ treatment, data = subset(spad_24_FC_out, sampling == 4))
 
 #LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2024" & sampling == 3))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-##### Sampling Point 4
-
-2023: straw is significantly different from bare soil and cardboard
-```{r}
-
-#ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 4))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 4))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 4))
-
-#LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2023" & sampling == 4))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_FC, sampling == 4))
 AIC(model)
 summary(model)
 
@@ -6025,24 +4355,23 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-2024: no significant difference between treatments
+###### Sampling Point 5
+
 ```{r}
 
 # ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 4))
+aov <- aov(value ~ treatment, data = subset(spad_24_FC, sampling == 5))
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
+plot(aov)
 
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 4))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 4))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 4))
+#KW: Including outliers means there is absolutely no difference between treatments
+kruskal.test(value ~ treatment, data = subset(spad_24_FC, sampling == 5))
+dunnTest(value ~ treatment, data = subset(spad_24_FC_out, sampling == 5))
 
 #LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2024" & sampling == 4))
+model <- lmer(value ~ treatment + (1 | block), data = subset(spad_24_FC, sampling == 5))
 AIC(model)
 summary(model)
 
@@ -6063,119 +4392,5 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
-##### Sampling Point 5
 
-2023: no significant difference between treatments
-```{r}
 
-#ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 5))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 5))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 5))
-
-#LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2023" & sampling == 5))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-
-2024: no significant difference between treatments
-```{r}
-
-# ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 5))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2024" & sampling == 5))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 5))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2024" & sampling == 5))
-
-#LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2024" & sampling == 5))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
-##### Sampling Point 6
-
-2023: 
-```{r}
-
-#ANOVA
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 6))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-#KW
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 6))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2023" & sampling == 6))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 6))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2023" & sampling == 6))
-
-#LMM
-model <- lmer(bc_value ~ treatment + (1 | block), data = subset(spad_FC, year == "2023" & sampling == 6))
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ treatment)
-
-```
