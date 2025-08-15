@@ -18,6 +18,8 @@ library(lmerTest)     #mixed models
 library(broom.mixed)  #mixed models
 library(emmeans)
 library(moments)
+library(RColorBrewer)
+library(FSA)
 
 ```
 
@@ -63,13 +65,14 @@ soil_temp <- soil_temp %>%
 
 #data frame for the min, max, and average soil temp each day for each temp probe
 soil_temp_day <- soil_temp %>%
+                 mutate(temp_C = ifelse(year == "2024" & ID == "20351017" & month > 4 & month < 7, NA , temp_C)) %>% 
                  group_by(ID, block, plot, treatment, crop, year, study_yr, month, week, date) %>%
                  summarize(day_max = max(temp_C, na.rm = TRUE),
                            day_min = min(temp_C, na.rm = TRUE),
                            day_avg = (day_max + day_min)/2, 
                            tmp_dif = day_max - day_min) %>%
                  ungroup() 
-
+              
 #average max, min, and mean soil temp for the day for each treatment
 soil_temp_trt <- soil_temp_day %>%
                  group_by(treatment, year, week, month, study_yr, date) %>%
@@ -90,10 +93,13 @@ soil_temp_wk <- soil_temp_day %>%
 #min, max, and average soil temp for each month
 soil_temp_month <- soil_temp_day %>%
                    group_by(treatment, year, study_yr, month) %>%
-                   summarize(mon_avg_max = mean(day_max, na.rm = TRUE),
+                   summarize(count = n(),
                              mon_avg_min = mean(day_min, na.rm = TRUE),
+                             mon_avg_max = mean(day_max, na.rm = TRUE),
                              mon_avg = (mon_avg_max + mon_avg_min) / 2) %>%
                    ungroup()
+
+#write.csv(soil_temp_month, here::here("20250815_SCM_soil_temp.csv"), row.names=TRUE)
 
 #min, max, and average soil temp for May through October
 soil_temp_season <- soil_temp_day %>%
@@ -169,39 +175,43 @@ drip_irrigation <- drip_irrigation %>%
                           year = lubridate::isoyear(ymd(date)), 
                           month = lubridate::month(date),
                           week = lubridate::isoweek(ymd(date)),
+                          irrigation_mm = convert_precip(irrigation_in, 
+                                                         old_metric = "inches", 
+                                                         new_metric = "mm", 
+                                                         round = 2),
                           type = "drip") %>%
-                   dplyr::select('date', 'year', 'month', 'week', 'type', 'irrigation_in')
+                   dplyr::select('date', 'year', 'month', 'week', 'type', 'irrigation_mm')
 
 #combining precipitation and drip irrigation into a single table
 irrigation_day <- temp_precip_day %>%
                   mutate(type = "precip") %>%
-                  rename(irrigation_in = precip_in) %>%
-                  dplyr::select('date','year','month','week','type','irrigation_in') %>%
+                  rename(irrigation_mm = precip_mm) %>%
+                  dplyr::select('date','year','month','week','type','irrigation_mm') %>%
                   rbind(drip_irrigation)
 
 #total water input by type each week
 irrigation_wk <- irrigation_day %>%
                  group_by(year, month, week, type) %>%
-                 summarize(irrigation_in = sum(irrigation_in)) %>%
+                 summarize(irrigation_mm = sum(irrigation_mm)) %>%
                  ungroup()
 
 #total water input by type each month
 irrigation_mon <- irrigation_day %>%
                   group_by(year, month, type) %>%
-                  summarize(irrigation_in = sum(irrigation_in)) %>%
+                  summarize(irrigation_mm = sum(irrigation_mm)) %>%
                   ungroup()
 
 #total water input by type for May through October
 irrigation_season <- irrigation_day %>%
                      subset(month > 4 & month < 11) %>%
                      group_by(year, type) %>%
-                     summarize(irrigation_in = sum(irrigation_in)) %>%
+                     summarize(irrigation_mm = sum(irrigation_mm)) %>%
                      ungroup()
 
 #total water input by type for the whole year
 irrigation_yr <- irrigation_day %>%
                  group_by(year, type) %>%
-                 summarize(irrigation_in = sum(irrigation_in)) %>%
+                 summarize(irrigation_mm = sum(irrigation_mm)) %>%
                  ungroup()
 
 ```
@@ -244,7 +254,8 @@ soil_vwc_rt <- soil_vwc_rt %>%
                pivot_longer(cols = c('BM', 'CM'),
                             names_to = 'treatment',
                             values_to = "vwc_percent") %>%
-               mutate(vwc_percent = as.numeric(gsub('%', '', vwc_percent))) %>%
+               mutate(vwc_percent = as.numeric(gsub('%', '', vwc_percent)),
+                      vwc_percent = ifelse(vwc_percent == 0, NA, vwc_percent)) %>%
                drop_na(vwc_percent) %>%
                subset(date != "2023-10-04") %>%
                mutate_at('treatment' ,as.factor)
@@ -288,11 +299,23 @@ soil_vwc_wk_trt <- soil_vwc %>%
                    summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
                    ungroup()
 
+soil_vwc_wk_trt_full <- soil_vwc %>%
+                   group_by(treatment, sample_date, week, month, year) %>%
+                   summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+                   ungroup()
+
+soil_vwc_wk_trt_crop_full <- soil_vwc %>%
+                   group_by(treatment, crop, sample_date, week, month, year) %>%
+                   summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
+                   ungroup()
+
 #average soil moisture by crop, edge/center, and date (combines treatments)
 soil_vwc_wk_crop <- soil_vwc %>%
                     group_by(crop, bed_location, sample_date, week, month, year) %>%
                     summarize(vwc_per_wk = mean(vwc_percent, na.rm = TRUE)) %>%
                     ungroup()
+
+
 
 
 #calculating the average soil moisture for difference in soil moisture between center and edge for each plot and day
@@ -324,7 +347,6 @@ ggplot(subset(soil_temp_day, treatment == "CM"), aes(x = date, y = day_avg, colo
 
 ggplot(subset(soil_temp_day, treatment == "SM"), aes(x = date, y = day_avg, color = ID)) + geom_point() 
 
-
 ```
 Following differences in average air temp, soil temperature was higher in 2023 compared to 2024, particularly in July and August (Table X, Figure X)
 
@@ -339,55 +361,160 @@ Both cardboard mulch and straw mulch have a similarly moderating effect on avera
 
 ```{r}
 # Graphing the treatment average maximum daily soil temp perhaps shows the trends for bare soil a little more, but not so much that it's worth having an extra figure. 
-#What to do with the straw mulch in 2024?
+#What to do with the straw mulch in 2024? I don't trust the soil temp probe from 5/15 to 6/30, because it is so suddenly and so extremely different than the others. It's replaced on 7/1.
 
 # add note symbol for when mulch was applied, or make it show only after mulch is applied.
 ggplot() + 
-  geom_line(data = subset(soil_temp_trt, year == "2023" & 
-                                    month > 4 & 
-                                    month < 11), 
+  geom_line(data = soil_temp_trt, 
        aes(x = date, 
            y = trt_avg, 
+           color = treatment)) +
+  theme_bw() +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "top") +
+  ylab("Daily Average Soil Temperature (celcius)") +
+  scale_color_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+    scale_x_date(breaks = as.Date(c("2023-06-01",
+                                  "2023-09-01", 
+                                  "2023-12-01", 
+                                  "2024-03-01", 
+                                  "2024-06-01", 
+                                  "2024-09-01",
+                                  "2024-12-01",  
+                                  "2025-03-01")),
+               minor_breaks = as.Date(c("2023-05-01",
+                                  "2023-07-01",
+                                  "2023-08-01",      
+                                  "2023-10-01",
+                                  "2023-11-01",
+                                  "2024-01-01",
+                                  "2024-02-01",
+                                  "2024-04-01",
+                                  "2024-05-01",
+                                  "2024-07-01", 
+                                  "2024-08-01",
+                                  "2024-10-01",
+                                  "2024-11-01", 
+                                  "2025-01-01",
+                                  "2025-02-01",
+                                  "2025-04-01",
+                                  "2025-05-01"
+                                        )),
+               labels = c("Jun 2023", "Sept 2023", "Dec 2023",
+                          "Mar 2024", "Jun 2024", "Sept 2024", "Dec 2024",
+                          "Mar 2025")) + 
+  geom_vline(xintercept = as.numeric(as.Date("2023-06-22")), linetype = 2) + 
+  geom_vline(xintercept = as.numeric(as.Date("2024-06-02")), linetype = 2)
+
+ggsave("20250815_SCM_soil_temp_avg.png", width = 9, height = 6)
+
+```
+
+max - this is where the difference between treatments is coming from, but not as interesting as the graph showing differences
+```{r}
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt, year == "2023"), 
+       aes(x = date, 
+           y = trt_avg_max, 
            color = treatment)) +
   geom_line(data = subset(temp_precip_day, year == "2023" & 
-                                    month > 4 & 
-                                    month < 11), 
+                                    month > 5), 
             aes(x = date, 
-                y = avg_temp_C)) +
+                y = max_temp_C), color = "gray", linetype = 2) +
   theme_bw()
 
+
 ggplot() + 
-  geom_line(data = subset(soil_temp_trt, year == "2023" & 
-                                    month > 4 & 
-                                    month < 11), 
+  geom_line(data = subset(soil_temp_trt, year == "2024"), 
+       aes(x = date, 
+           y = trt_avg_max, 
+           color = treatment)) +
+  geom_line(data = subset(temp_precip_day, year == "2024"), 
+            aes(x = date, 
+                y = max_temp_C), color = "gray", linetype = 2) +
+  theme_bw()
+
+
+```
+
+min - there aren't really differences between treatments
+```{r}
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt, year == "2023"), 
+       aes(x = date, 
+           y = trt_avg_min, 
+           color = treatment)) +
+  geom_line(data = subset(temp_precip_day, year == "2023" & 
+                                    month > 5), 
+            aes(x = date, 
+                y = min_temp_C), color = "gray", linetype = 2) +
+  theme_bw()
+
+
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt, year == "2024"), 
+       aes(x = date, 
+           y = trt_avg_min, 
+           color = treatment)) +
+  geom_line(data = subset(temp_precip_day, year == "2024"), 
+            aes(x = date, 
+                y = min_temp_C), color = "gray", linetype = 2) +
+  theme_bw()
+
+
+```
+
+Difference between max and min temp
+```{r}
+ggplot() + 
+  geom_line(data = subset(soil_temp_trt), 
        aes(x = date, 
            y = trt_dif, 
-           color = treatment)) +
-  theme_bw()
+           color = treatment), linewidth = .5) +
+  theme_bw()+ 
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "inside",
+        legend.position.inside = c(0.8,0.75)) +
+  ylab("Difference between max and min temp (celcius)") +
+  scale_color_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_date(breaks = as.Date(c("2023-06-01",
+                                  "2023-09-01", 
+                                  "2023-12-01", 
+                                  "2024-03-01", 
+                                  "2024-06-01", 
+                                  "2024-09-01",
+                                  "2024-12-01",  
+                                  "2025-03-01")),
+               minor_breaks = as.Date(c("2023-07-01",
+                                  "2023-08-01",      
+                                  "2023-10-01",
+                                  "2023-11-01",
+                                  "2024-01-01",
+                                  "2024-02-01",
+                                  "2024-04-01",
+                                  "2024-05-01",
+                                  "2024-07-01", 
+                                  "2024-08-01",
+                                  "2024-10-01",
+                                  "2024-11-01", 
+                                  "2025-01-01",
+                                  "2025-02-01",
+                                  "2025-04-01",
+                                  "2025-05-01"
+                                        )),
+               labels = c("Jun 2023", "Sept 2023", "Dec 2023",
+                          "Mar 2024", "Jun 2024", "Sept 2024", "Dec 2024",
+                          "Mar 2025"))  
 
-ggplot() + 
-  geom_line(data = subset(soil_temp_trt, year == "2024" & 
-                                    month > 4 & 
-                                    month < 11), 
-       aes(x = date, 
-           y = trt_avg, 
-           color = treatment)) +
-  geom_line(data = subset(temp_precip_day, year == "2024" & 
-                                    month > 4 & 
-                                    month < 11), 
-            aes(x = date, 
-                y = avg_temp_C)) +
-  theme_bw()
+ggsave("20250815_SCM_soil_temp_dif.png", width = 9, height = 6)
 
 
-ggplot() + 
-  geom_line(data = subset(soil_temp_trt, year == "2024" & 
-                                    month > 4 & 
-                                    month < 11), 
-       aes(x = date, 
-           y = trt_dif, 
-           color = treatment)) +
-  theme_bw()
 
 ```
 
@@ -409,6 +536,60 @@ ggplot() +
   theme_bw()
 
 ```
+Just when we have multiple temp probes
+```{r}
+first_mon <- soil_temp_day %>%
+             subset(date < "2023-07-21") %>%
+             mutate(mulch = ifelse(date < "2023-06-23", "pre-mulch",
+                                   "post-mulch")) %>%
+             mutate_at('mulch', as.factor) %>%
+             mutate(mulch = relevel(mulch, ref = "pre-mulch"))
+
+first_mon_avg <- first_mon %>%
+                 group_by(treatment, year, week, month, date, mulch) %>%
+                 summarize(trt_avg_max = mean(day_max, na.rm = TRUE),
+                           trt_avg_min = mean(day_min, na.rm = TRUE),
+                           trt_avg = (trt_avg_max + trt_avg_min)/2,
+                           trt_dif = trt_avg_max - trt_avg_min) %>%
+                 ungroup()
+
+ggplot() + 
+  geom_point(data = first_mon, aes(x=date, y = day_avg, color = treatment), size = 0.5) + 
+  geom_line(data = first_mon_avg, aes(x=date, y=trt_avg, color = treatment), linewidth = 0.75) +
+  theme_bw() +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "top") +
+  ylab("Daily Average Soil Temperature (celcius)") +
+  scale_color_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_date(breaks = as.Date(c("2023-06-01", 
+                                  "2023-06-15",
+                                  "2023-07-01", 
+                                  "2023-07-15")),
+               minor_breaks = as.Date(c("2023-05-15",
+                                  "2023-07-30")),
+                              labels = c("Jun 1", "Jun 15", 
+                          "Jul 1", "Jul 15")) + 
+  geom_vline(xintercept = as.numeric(as.Date("2023-06-22")), linetype = 2)
+
+  
+ggsave("20250815_SCM_soil_temp_2023.png", width = 6, height = 4)
+```
+
+```{r}
+model <- aov(day_avg ~ treatment, data = subset(first_mon, mulch == "pre-mulch"))
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+model <- aov(day_avg ~ treatment, data = subset(first_mon, mulch == "post-mulch"))
+summary(model)
+TukeyHSD(model)
+plot(model)
+
+```
 
 
 
@@ -421,28 +602,191 @@ During the growing season in 2023, there was 22.8 inches of rain recorded at the
 #I'm largely sticking to bar graphs here because I'll combine with the soil moisture visualization eventually
 
 # daily
-ggplot(subset(irrigation_day, month > 4 & month < 11 & year == 2023), aes(x = factor(date), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity") 
+ggplot(subset(irrigation_day, month > 4 & month < 11 & year == 2023), aes(x = factor(date), y = irrigation_mm, fill=type, color = type)) + geom_bar(stat = "identity") 
   
-ggplot(subset(irrigation_day, month > 4 & month < 11 & year == 2024), aes(x = factor(date), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity") 
+ggplot(subset(irrigation_day, month > 4 & month < 11 & year == 2024), aes(x = factor(date), y = irrigation_mm, fill=type, color = type)) + geom_bar(stat = "identity") 
 
 # weekly
-ggplot(subset(irrigation_wk, month > 4 & month < 11 & year == 2023), aes(x = factor(week), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+ggplot(subset(irrigation_wk, month > 4 & month < 11), aes(x = factor(week), y = irrigation_mm, fill=type)) + geom_bar(stat = "identity", position = "dodge", width = 0.75) + facet_wrap(~year) +
+  theme_bw() + 
+  xlab("Weeks after January 1") +
+  ylab("Water input (in)") +
+  scale_fill_manual(name = "Input Type", 
+                    labels = c("Drip Irrigation", "Precipitation"), 
+                    values = c("#FC8D62", "#66C2A5")) + 
+  theme(axis.text.x = element_text(size = 6))
+
+ggsave("20250811_SCM_water_input.png", width = 9, height = 4)
+
+
   
-ggplot(subset(irrigation_wk, month > 4 & month < 11 & year == 2024), aes(x = factor(week), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+ggplot(subset(irrigation_wk, month > 4 & month < 11 & year == 2024), aes(x = factor(week), y = irrigation_mm, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
 
 # monthly
-ggplot(subset(irrigation_mon, month > 4 & month < 11 & year == 2023), aes(x = factor(month), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+ggplot(subset(irrigation_mon, month > 4 & month < 11 & year == 2023), aes(x = factor(month), y = irrigation_mm, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
   
-ggplot(subset(irrigation_mon, month > 4 & month < 11 & year == 2024), aes(x = factor(month), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+ggplot(subset(irrigation_mon, month > 4 & month < 11 & year == 2024), aes(x = factor(month), y = irrigation_mm, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
 
 # season
-ggplot(irrigation_season, aes(x = factor(year), y = irrigation_in, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+ggplot(irrigation_season, aes(x = factor(year), y = irrigation_mm, fill=type, color = type)) + geom_bar(stat = "identity", position = "dodge") 
+
+
 
 ```
 
 ## Soil Moisture
 
+#### For manuscript
 
+##### Statistical Analysis
+
+```{r}
+sum_stat_vwc_overall_c <- soil_vwc %>%
+                        group_by(treatment, crop) %>%
+                summarize(min = min(vwc_percent, na.rm = TRUE),
+                          median = median(vwc_percent, na.rm = TRUE),
+                          max = max(vwc_percent, na.rm = TRUE),
+                          mean = mean(vwc_percent, na.rm = TRUE),
+                          sd = sd(vwc_percent, na.rm = TRUE))  
+
+sum_stat_vwc_overall <- soil_vwc %>%
+                        group_by(treatment, year) %>%
+                summarize(min = min(vwc_percent, na.rm = TRUE),
+                          median = median(vwc_percent, na.rm = TRUE),
+                          max = max(vwc_percent, na.rm = TRUE),
+                          mean = mean(vwc_percent, na.rm = TRUE),
+                          sd = sd(vwc_percent, na.rm = TRUE))  
+
+sum_stat_vwc_c <- soil_vwc %>%
+                group_by(year, month, treatment, crop) %>%
+                summarize(min = min(vwc_percent, na.rm = TRUE),
+                          median = median(vwc_percent, na.rm = TRUE),
+                          max = max(vwc_percent, na.rm = TRUE),
+                          mean = mean(vwc_percent, na.rm = TRUE),
+                          sd = sd(vwc_percent, na.rm = TRUE))
+
+write.csv(sum_stat_vwc_c, here::here("20250815_SCM_soil_vwc_c.csv"), row.names=TRUE)
+
+sum_stat_vwc <- soil_vwc %>%
+                group_by(year, month, treatment) %>%
+                summarize(min = min(vwc_percent, na.rm = TRUE),
+                          median = median(vwc_percent, na.rm = TRUE),
+                          max = max(vwc_percent, na.rm = TRUE),
+                          mean = mean(vwc_percent, na.rm = TRUE),
+                          sd = sd(vwc_percent, na.rm = TRUE))
+
+write.csv(sum_stat_vwc, here::here("20250815_SCM_soil_vwc.csv"), row.names=TRUE)
+
+#Overall LMM
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date/block), data = soil_vwc)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+#2023 only LMM
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date/block), data = soil_vwc_23)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+#2024 only (I had my doubts that the LMM met model assumptions)
+model <- aov(vwc_percent ~ treatment*crop, soil_vwc_24)
+AIC(model)
+summary(model)
+TukeyHSD(model)
+plot(model)
+```
+
+##### Figures and Tables
+
+```{r}
+# Weekly
+
+ggplot() + 
+  geom_point(data = soil_vwc, aes(x = sample_date, y = vwc_percent, color = treatment), size = 0.75) + 
+  geom_line(data = soil_vwc_wk_trt_crop_full, aes(x = sample_date, y = vwc_per_wk, color = treatment), linewidth = 1) +  
+  facet_wrap(~year + crop, scales = "free_x") +
+  theme_bw() + 
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(), 
+        legend.position = "top") +
+  ylab("Soil Moisture (%)") +
+  scale_color_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6"))
+
+ggsave("20250815_SCM_soil_moisture_crop.png")
+
+
+ggplot() + 
+  geom_point(data = soil_vwc, aes(x = sample_date, y = vwc_percent, color = treatment), size = 0.75) + 
+  geom_line(data = soil_vwc_wk_trt_full, aes(x = sample_date, y = vwc_per_wk, color = treatment), linewidth = 1) +  
+  facet_wrap(~year, scales = "free_x", dir = "v") +
+  theme_bw() + 
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(), 
+        legend.position = "top") +
+  ylab("Soil Moisture (%)") +
+  scale_color_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6"))
+
+ggsave("20250815_SCM_soil_moisture.png")
+
+
+# Real time
+
+ggplot(data = soil_vwc_rt, 
+       aes(x = date.time, 
+           y = vwc_percent, 
+           color = treatment)) + 
+  geom_line() +
+  theme_bw() +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "top") +
+  ylab("Soil Moisture (%)") +
+  scale_color_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_datetime(breaks = as.POSIXct(c("2023-07-01", 
+                                  "2023-08-01", 
+                                  "2023-09-01", 
+                                  "2023-10-01")),
+               labels = c("Jul 2023", "Aug 2023", "Sept 2023",
+                          "Oct 2023"))
+
+ggsave("20250815_SCM_vwc_rt.png")
+
+```
 
 ### Visualization
 
@@ -461,16 +805,8 @@ ggplot(soil_vwc_dif_plot, aes(x = crop, y = loc_dif, fill = treatment)) + geom_b
 Here, I visualize the soil moisture across the season for each treatment-crop-year. Soil moisture in the centers is visually similar for all treatments each week; a difference between treatments is clearer in 2024.
 ```{r}
 
-ggplot() + 
-  geom_point(data = subset(soil_vwc, bed_location == "center"), aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
-  geom_line(data = subset(soil_vwc_wk_trt_crop, bed_location == "center"), aes(x = week, y = vwc_trt_avg_wk, color = treatment)) + 
-  facet_wrap(~year + crop)
 
-ggplot() + 
-  geom_point(data = subset(soil_vwc, bed_location == "edge"), aes(x = week, y = vwc_percent, color = treatment), size = 0.75) + 
-  geom_line(data = subset(soil_vwc_wk_trt_crop, bed_location == "edge"), aes(x = week, y = vwc_trt_avg_wk, color = treatment)) + 
-  facet_wrap(~year + crop)
-
+  
 
 #based on readings, I think this is actually the plot I'll uses in the publication
 ggplot(subset(soil_vwc, year == 2023), aes(x = as.factor(week), y = vwc_percent, fill = treatment)) + geom_boxplot() + facet_grid(~crop)
@@ -489,7 +825,7 @@ ggplot(subset(soil_vwc, year == 2024 & bed_location == "edge"), aes(x = as.facto
 
 ### Normality
 
-#### Overall 
+##### Overall 
 
 The original dataset is non-parametric with a lambda of 1.3, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
 ```{r}
@@ -578,7 +914,7 @@ qqline(soil_vwc_24$sq_vwc)
 shapiro.test(soil_vwc_24$sq_vwc)
 ```
 
-#### Center only 
+##### Center only 
 
 The original dataset is non-parametric with a lambda of 1.4, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
 ```{r}
@@ -680,7 +1016,7 @@ shapiro.test(center_vwc_24$sq_vwc)
 ```
 
 
-#### Edge only 
+##### Edge only 
 
 The original dataset is non-parametric with a lambda of 1, indicating that a boxcox or squared transformation would be most appropriate. Neither is successful
 ```{r}
@@ -818,7 +1154,7 @@ kruskal.test(vwc_percent~year, data = subset(soil_vwc, crop == "DB"))
 kruskal.test(vwc_percent~year, data = subset(soil_vwc, crop == "FC"))
 
 #LMM
-model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date/block), data = soil_vwc)
+model <- lmer(vwc_percent ~ treatment*crop + (1 | sample_date), data = soil_vwc)
 AIC(model)
 summary(model)
 
@@ -838,6 +1174,8 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 ```
+
+
 ##### 2023
 ```{r}
 # There are treatment, crop, year, treatment*year, and crop*year interactions.
@@ -896,6 +1234,8 @@ ranova(model)
 emmeans(model, pairwise ~ crop)
 
 ```
+
+
 ##### 2024
 ```{r}
 # There are treatment, crop, year, treatment*year, and crop*year interactions.

@@ -236,6 +236,7 @@ spad <- spad %>%
         dplyr::select(-average_reading) %>%
         mutate(date_collected = lubridate::as_date(date_collected, format = "%m/%d/%Y"),
                year = lubridate::isoyear(ymd(date_collected))) %>%
+        subset(date_collected != "2023-08-24") %>%
         pivot_longer(cols = c("reading_1", "reading_2", "reading_3"),
                      names_to = "reading",
                      values_to = "value") %>%
@@ -244,6 +245,8 @@ spad <- spad %>%
 spad_AS <- subset(spad, crop == "AS")
 spad_DB <- subset(spad, crop == "DB")
 spad_FC <- subset(spad, crop == "FC")
+
+spad_out <- spad
 ```
 
 #### Strawberries
@@ -265,6 +268,11 @@ spad_AS_out <- spad_AS
 #outliers removed
 spad_AS <- spad_AS %>%
            subset(value > lower_bound & value < upper_bound)
+
+spad_23_AS <- subset(spad_AS, year == "2023")
+spad_23_AS_out <- subset(spad_AS_out, year == "2023")
+spad_24_AS <- subset(spad_AS, year == "2024")
+spad_24_AS_out <- subset(spad_AS_out, year == "2024")
 
 #Transformation for Strawberries 2023 
 bc <- boxcox(lm(spad_23_AS$value ~ 1))
@@ -297,6 +305,11 @@ spad_DB_out <- spad_DB
 spad_DB <- spad_DB %>%
            subset(value > lower_bound & value < upper_bound)
 
+spad_23_DB <- subset(spad_DB, year == "2023")
+spad_23_DB_out <- subset(spad_DB_out, year == "2023")
+spad_24_DB <- subset(spad_DB, year == "2024")
+spad_24_DB_out <- subset(spad_DB_out, year == "2024")
+
 ```
 
 #### Collards
@@ -317,6 +330,13 @@ spad_FC_out <- spad_FC
 #outliers removed
 spad_FC <- spad_FC %>%
            subset(value > lower_bound & value < upper_bound)
+
+spad <- rbind(spad_AS, spad_DB, spad_FC)
+
+spad_23_FC <- subset(spad_FC, year == "2023")
+spad_23_FC_out <- subset(spad_FC_out, year == "2023")
+spad_24_FC <- subset(spad_FC, year == "2024")
+spad_24_FC_out <- subset(spad_FC_out, year == "2024")
 
 ```
 
@@ -449,7 +469,224 @@ ggplot(subset(yield, crop == "FC"), aes(x = treatment, y = total_g)) + geom_boxp
 
 ## Annual Yield
 
-### Final visualizations
+#### For manuscript
+
+##### Statistical Analysis
+Strawberries
+```{r}
+# 2023: there is a significant difference between bare soil and the mulches
+aov <- aov(total_g ~ treatment, data = yield_23_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#there is not a significant difference between treatments. model assumptions are met.
+aov <- aov(per_market ~ treatment, data = yield_23_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2024: there is a significant difference between bare soil and the mulches
+aov <- aov(total_g ~ treatment, data = yield_24_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+
+# 2024: There was a significant difference between CM and BM for percent marketable strawberry yield
+
+kruskal.test(per_market ~ treatment, data = yield_24_AS)
+dunnTest(per_market ~ treatment, data = yield_24_AS)
+
+
+
+```
+
+Beans
+```{r}
+#overall: While the dataset is non-parametric, it seems to meet assumptions. I tried the boxcox transformed version (which is also not normally distributed), and it definitely did not meet assumptions. There is a difference between years, but not treatments 
+aov <- aov(total_g ~ treatment*year, data = yield_yr_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# There is not a significant difference between years for percent marketable yield
+kruskal.test(per_market ~ year, data = yield_yr_DB)
+
+# 2023: there is a nearly significant difference between BM and SM
+aov <- aov(total_g ~ treatment, data = yield_23_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2024: there is no significant difference between treatments
+aov <- aov(bc_total ~ treatment, data = yield_24_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2023: Pretty sure everything was 100%
+kruskal.test(per_market ~ treatment, data = yield_23_DB)
+
+# 2024: Bare soil is significantly less than straw, nearly significantly less than cardboard
+kruskal.test(per_market ~ treatment, data = yield_24_DB)
+dunnTest(per_market ~ treatment, data =yield_24_DB)
+
+```
+
+Collards
+```{r}
+# There is was a significant difference in treatment, but there is between years
+aov <- aov(total_g ~ treatment*year, data = yield_yr_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#running KW, just to check
+kruskal.test(total_g ~ year, data = yield_yr_FC)
+
+# there is not a significant difference between treatments
+aov <- aov(per_market ~ treatment, data = yield_yr_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(per_market ~ treatment, data = yield_yr_FC)
+
+
+# 2023: no difference between treatments
+aov <- aov(cubic_total ~ treatment, data = yield_23_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_g ~ treatment, data = yield_23_FC)
+
+
+aov <- aov(per_market ~ treatment, data = yield_23_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(per_market ~ treatment, data = yield_23_FC)
+
+# 2024: no treatment differences
+aov <- aov(total_g ~ treatment, data = yield_24_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2024: tried the transformed dataset as well, and it didn't make a huge difference in model quality
+aov <- aov(per_market ~ treatment, data = yield_24_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(per_market ~ treatment, data = subset(yield_yr_FC, year == "2024"))
+
+```
+
+##### Figures and Tables
+
+
+```{r}
+# average and SD
+yield_yr$total_kg <- yield_yr$total_g/1000
+
+sum_stat_yield <- yield_yr %>%
+                    group_by(year, crop, treatment) %>%
+                    summarize(min_yield = min(total_kg, na.rm = TRUE),
+                              median_yield = median(total_kg, na.rm = TRUE),
+                              max_yield = max(total_kg, na.rm = TRUE),
+                              avg_yield = mean(total_kg, na.rm = TRUE),
+                              sd_yield = sd(total_kg, na.rm = TRUE))
+
+sum_stat_per <- yield_yr %>%
+                    group_by(year, crop, treatment) %>%
+                    summarize(min_yield = min(per_market, na.rm = TRUE),
+                              median_yield = median(per_market, na.rm = TRUE),
+                              max_yield = max(per_market, na.rm = TRUE),
+                              avg_yield = mean(per_market, na.rm = TRUE),
+                              sd_yield = sd(per_market, na.rm = TRUE))
+
+write.csv(sum_stat_per, here::here("20250813_SCM_marketable.csv"), row.names=TRUE)
+
+dat_text <- data.frame(
+  label = c("a", "a", "a", "?", "?", "?", "?", "?", "?"),
+  crop   = c("AS", "AS", "AS", "DB", "DB", "DB", "FC", "FC", "FC")
+)
+
+dat_text$crop <- as.factor(dat_text$crop) 
+
+# total yield
+
+ggplot(yield_yr, aes(x = year, 
+                   y = total_kg, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Total Yield (kg)") +
+  facet_wrap(~crop, scales = "free_y", labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank()) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) + 
+  guides(fill = FALSE)
+
+ggsave("20250813_SCM_yield.png")
+
+ggplot(yield_yr, aes(x = year, 
+                   y = per_market, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Marketable Yield (as % of total yield)") +
+  facet_wrap(~crop, labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "inside",
+        legend.position.inside = c(0.5,0.25)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
+  
+  ggsave("20250813_SCM_marketable.png")
+  
+
+
+ggplot(yield_wk, aes(x = week, 
+                   y = total_g, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  facet_wrap(~year + crop, scales = "free_y", labeller = as_labeller(c("2023" = "2023", "2024" = "2024", AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  xlab("Weeks after January 1") +
+  ylab("Total Yield (g)") +
+  theme(axis.title.y = element_text(vjust = 3),
+        legend.position = "top",
+        axis.text.x = element_text(angle = 45)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
+
+ggsave("20250813_SCM_yield_week.png", width = 9, height = 6)
+  
+
+```
+
+### Visualizations
 
 #### Yield
 ```{r}
@@ -1285,7 +1522,7 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 #ranked likelihood test
 ranova(model)
 
-emmeans(model, pairwise ~ treatment*year)
+emmeans(model, pairwise ~ treatment)
 
 ```
 
@@ -1590,46 +1827,7 @@ ggplot(subset(yield_yr, crop == "FC"), aes(x = treatment, y = per_market)) + geo
 
 ```
 
-```{r}
-# There is not a significant difference in percent marketable collard yield over both years
-aov <- aov(per_market ~ treatment, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
 
-kruskal.test(per_market ~ treatment, data = yield_yr_FC)
-
-# There is a significant difference between years for marketable yield
-aov <- aov(per_market ~ year, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(per_market ~ year, data = yield_yr_FC)
-
-# I can check for interactions, because it's normally distributed - there are some, but they don't give me more useful information than just analyzing the years separately
-aov <- aov(per_market ~ treatment*year, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-# 2023: there was not a significant difference between mulch treatments percent marketable collard yield
-aov <- aov(per_market ~ treatment, data = subset(yield_yr_FC, year == "2023"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(per_market ~ treatment, data = subset(yield_yr_FC, year == "2023"))
-
-# 2024: there was not a significant difference between mulch treatments percent marketable collard yield
-aov <- aov(per_market ~ treatment, data = subset(yield_yr_FC, year == "2024"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(per_market ~ treatment, data = subset(yield_yr_FC, year == "2024"))
-
-```
 
 
 Overall
@@ -2154,7 +2352,209 @@ emmeans(model, pairwise ~ treatment)
 
 ## Foliar Chlorophyll
 
-TRY THE ANALYSIS WITH BOTH DATASETS
+
+#### For manuscript
+
+##### Statistical Analysis
+
+Strawberries
+```{r}
+# Overall
+# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - and year is no longer a significant predictor, though there are some interaction effects that I don't think I'm really interested in AIC 5927
+model <- lmer(value ~ treatment*year + (1 | date_collected/block), data = spad_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+
+# In 2023, bare soil was significantly different from straw and cardboard. 
+# rANOVA indicates that block is a significant random effect (p = 0.006) for 2023. emmeans shows that bare soil is significantly different from cardboard mulch (p = 0.03)
+model <- lmer(value ~ treatment + (1 | date_collected/block), data = spad_23_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# In 2024, there was not a significant difference between treatments. Running it with outliers included does not substantively change the results (though the dataset definitely does NOT meet ANOVA model assumptions) 
+aov <- aov(value ~ treatment, data = spad_24_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+
+```
+
+
+Beans
+```{r}
+#While the dataset is not normally distributed according to the Shapiro-Wilk, it does look like it meets model assumptions here, at least in the way these often do
+aov <- aov(value ~ treatment*year, data = spad_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2023 - LMM: no differences
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_23_DB)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+# 2024: LMM: date_collected is a significant RE. We also start to see a potential difference between bare soil and cardboard mulch. Including outliers does change the result = there is also a difference between bare soil and straw
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_24_DB)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+```
+
+```{r}
+# Overall if I try an LMM with date_collected as the random effect, I get a better quality model - year is still significant, though there are some interaction effects that I don't think I'm really interested in
+model <- lmer(value ~ treatment*year + (1 | date_collected/block), data = spad_FC)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ year)
+
+#2023 ANOVA: no differences
+aov <- aov(value ~ treatment, data = spad_23_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2024 ANOVA: no differences
+aov <- aov(value ~ treatment, data = spad_24_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+```
+
+##### Figures and Tables
+
+
+```{r}
+# average and SD
+sum_stat_spad <- spad %>%
+                    group_by(year, crop, treatment) %>%
+                    summarize(min_spad = mean(value, na.rm = TRUE),
+                              median_spad = median(value, na.rm = TRUE),
+                              max_spad = max(value, na.rm = TRUE),
+                              avg_spad = mean(value, na.rm = TRUE),
+                              sd_spad = sd(value, na.rm = TRUE))
+
+write.csv(sum_stat_spad, here::here("20250813_SCM_spad.csv"), row.names=TRUE)
+
+
+# SPAD
+
+ggplot(spad, aes(x = year, 
+                   y = value, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("SPAD Value") +
+  facet_wrap(~crop, scales = "free_y", labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
+
+ggsave("20250812_SCM_spad.png")
+
+
+ggplot(spad, aes(x = as.factor(date_collected), 
+                   y = value, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  facet_wrap(~crop, scales = "free_y", labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  ylab("SPAD value") +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "top",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
+
+ggsave("20250813_SCM_spad_week.png", width = 9, height = 6)
+
+```
 
 ### Visualization
 
@@ -2244,16 +2644,16 @@ kruskal.test(value ~ treatment, data = subset(spad, crop == "DB" & year == "2024
 #### Strawberries
 
 ##### Overall
-There are significant differences between years and treatments, and interactions, which I'm less sure how to think through. 
+Now there are significant differences between the years, after removing 8/24/2023
 ```{r}
-#While the dataset is not normally distributed according to the Shapiro-Wilk, it does look like it meets model assumptions here. Across the whole data set, there is an interaction between treatment and year, and both treatment and year are significantly different
+#While the dataset is not normally distributed according to the Shapiro-Wilk, it does look like it meets model assumptions here. Across the whole data set, there is an interaction between treatment and year, and both treatment and year are significantly different. AIC 6224
 aov <- aov(value ~ treatment*year, data = spad_AS)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
 plot(aov)
 
-# If we try an LMM, we see the same results as the ANOVA, but the SM-CM difference is now significant
+# If we try an LMM, we see the same results as the ANOVA, but the SM-CM difference is now significant, But, the model does not meet assumptions
 model <- lmer(value ~ treatment*year + (1 | block), data = spad_AS)
 AIC(model)
 summary(model)
@@ -2274,7 +2674,7 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 
-# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - and year is no longer a significant predictor, though there are some interaction effects that I don't think I'm really interested in
+# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - and year is no longer a significant predictor, though there are some interaction effects that I don't think I'm really interested in AIC 5927
 model <- lmer(value ~ treatment*year + (1 | date_collected/block), data = spad_AS)
 AIC(model)
 summary(model)
@@ -2300,7 +2700,7 @@ Now that we see that year isn't a great fixed effect when we use date_collected 
 
 ```{r}
 # I could still include year here, technically, because it contributes treatment:year interactions, but year itself doesn't have a significant impact
-model <- lmer(bc_value ~ treatment + (1 | date_collected/block), data = spad_AS)
+model <- lmer(value ~ treatment*year + (1 | block), data = spad_AS)
 AIC(model)
 summary(model)
 
@@ -2317,7 +2717,7 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 #ranked likelihood test
 ranova(model)
 
-emmeans(model, pairwise ~ treatment)
+emmeans(model, pairwise ~ treatment*year)
 
 # KW test finds similar difference between treatments, though the CM-SM isn't significant
 kruskal.test(value ~ treatment, data = spad_AS)
@@ -3129,7 +3529,7 @@ plot(aov)
 # KW: no differences. I also ran this with outliers included, and it didn't substantially change the results
 kruskal.test(value ~ treatment, data = spad_23_DB)
 
-# LMM: no differences, block is a significant RE
+# LMM: no differences, block is not a significant RE
 model <- lmer(value ~ treatment + (1 | block), data = spad_23_DB)
 AIC(model)
 summary(model)
@@ -3705,32 +4105,6 @@ emmeans(model, pairwise ~ treatment)
 
 ### Collards
 
-```{r}
-
-# In 2023, there were no significant differences between treatments. This finding is the same for ANOVA/transformed; no-outliers, KW/untransformed, no-outliers; KW/untransformed, with outliers
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2023"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2023"))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2023"))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2023"))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2023"))
-
-# In 2024, there were no significant differences between treatments. This finding is the same for ANOVA/transformed; no-outliers, KW/untransformed, no-outliers; KW/untransformed, with outliers
-aov <- aov(bc_value ~ treatment, data = subset(spad_FC, year == "2024"))
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-kruskal.test(value ~ treatment, data = subset(spad_FC, year == "2024"))
-dunnTest(value ~ treatment, data = subset(spad_FC, year == "2024"))
-
-kruskal.test(value ~ treatment, data = subset(spad_FC_out, year == "2024"))
-dunnTest(value ~ treatment, data = subset(spad_FC_out, year == "2024"))
-```
 
 
 ##### Overall
@@ -3764,7 +4138,7 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 
-# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - and year is no longer a significant predictor, though there are some interaction effects that I don't think I'm really interested in
+# NOW, if I try an LMM with date_collected as the random effect, I get a better quality model - year is still significant, though there are some interaction effects that I don't think I'm really interested in
 model <- lmer(value ~ treatment*year + (1 | date_collected/block), data = spad_FC)
 AIC(model)
 summary(model)

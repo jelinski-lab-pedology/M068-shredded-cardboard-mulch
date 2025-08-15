@@ -17,6 +17,7 @@ library(lmerTest)     #mixed models
 library(broom.mixed)  #mixed models
 library(emmeans)
 library(FSA)
+library(RColorBrewer)
 
 ```
 
@@ -117,6 +118,78 @@ initial_agg <- soil_fert %>%
 
 In summary, there's a significant difference in soil P between the start and end of the experiment, and between May and October each year. However, there are no significant differences between treatments and/or crops. The only time there is *maybe* as significant difference is between bare soil and straw mulch in October 2024. But if I really do cut off at 0.05, then it's not.
 
+#### For manuscript
+
+##### Statistical Analysis
+
+```{r}
+#LMM for treatment differences
+model <- lmer(bray_p_ppm ~ treatment + (1 | sample_date/block), data = soil_fert)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
+
+#ANOVA for sample date differences (because LMM did not meet model assumptions)
+aov <- aov(bray_p_ppm ~ as.factor(sample_date), data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+```
+
+##### Figures and Tables
+
+```{r}
+# average and SD
+sum_stat_p <- soil_p %>%
+              group_by(year) %>%
+              summarize(avg_bray_p_ppm = mean(bray_p_ppm, na.rm = TRUE),
+                        sd_bray_p_ppm = sd(bray_p_ppm, na.rm = TRUE))
+
+
+# SI figure:
+
+ggplot(data = subset(soil_fert, month == 5 | month == 10), aes(x = as.factor(sample_date), 
+                   y = bray_p_ppm, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  xlab("Sampling Date") + 
+  ylab("Bray Phosphorus (ppm)") +
+  ylim(285,365) + 
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "inside",
+        legend.position.inside = c(0.15,0.84)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_discrete(labels = c("May 2023", "Oct 2023", "May 2024", "Oct 2024")) + 
+  annotate("text", x = 1, y = 328, label = "a") + 
+  annotate("text", x = 2, y = 360, label = "b") +
+  annotate("text", x = 3, y = 360, label = "c") +
+  annotate("text", x = 4, y = 360, label = "d")
+
+#ggsave("20250810_SCM_soil_p.png", width = 6, height = 4)
+
+```
+
+
 ### Visualization
 
 This is the visualization that best reflects the results
@@ -193,11 +266,12 @@ kruskal.test(bray_p_ppm ~ crop, data = soil_fert)
 kruskal.test(bray_p_ppm ~ year, data = soil_fert)
 
 
-aov <- aov(bray_p_ppm ~ year, data = soil_fert)
+aov <- aov(bray_p_ppm ~ as.factor(sample_date), data = soil_fert)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
 plot(aov)
+
 
 ```
 
@@ -273,7 +347,7 @@ AIC(aov)
 plot(aov)
 
 # LMM for the two highest quality models. block is not a significant random effect for either
-model <- lmer(bray_p_ppm ~ treatment*month + (1 | block), data = soil_fert_23)
+model <- lmer(bray_p_ppm ~ treatment + (1 | month/block), data = soil_fert_23)
 AIC(model)
 summary(model)
 
@@ -290,8 +364,9 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 #ranked likelihood test
 ranova(model)
 
-emmeans(model, pairwise ~ month)
+emmeans(model, pairwise ~ treatment)
 
+#LMM 2
 model <- lmer(bray_p_ppm ~ month + (1 | block), data = soil_fert_23)
 AIC(model)
 summary(model)
@@ -693,6 +768,71 @@ emmeans(model, pairwise ~ crop)
 
 ### Total Carbon
 
+#### For manuscript
+
+##### Statistical Analysis
+
+```{r}
+#LMM comparing treatment and sample dates
+model <- lmer(total_c_wt_pct ~ treatment*as.factor(sample_date) + (1 | block), data = soil_fert)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ as.factor(sample_date))
+
+```
+
+##### Figures and Tables
+
+```{r}
+# average and SD
+sum_stat_c <- subset(soil_fert, month == 5 | month == 10) %>%
+              group_by(sample_date, treatment) %>%
+              summarize(min = min(total_c_wt_pct, na.rm = TRUE),
+                        median = median(total_c_wt_pct, na.rm = TRUE),
+                        max = max(total_c_wt_pct, na.rm = TRUE),
+                        avg_c_pct = mean(total_c_wt_pct, na.rm = TRUE),
+                        sd_c_pct = sd(total_c_wt_pct, na.rm = TRUE))
+
+
+# SI figure:
+
+ggplot(data = subset(soil_fert, month == 5 | month == 10), aes(x = as.factor(sample_date), 
+                   y = total_c_wt_pct, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Total Carbon (% by weight)") +
+  ylim(3.15, 4.7) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank()) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_discrete(labels = c("May 2023", "Oct 2023", "May 2024", "Oct 2024")) +
+  annotate("text", x = 1, y = 4.2, label = "a") + 
+  annotate("text", x = 2, y = 4.2, label = "ab") +
+  annotate("text", x = 3, y = 4.2, label = "b") +
+  annotate("text", x = 4, y = 4.6, label = "c") +
+  guides(fill = FALSE)
+
+#ggsave("20250810_SCM_soil_c.png", width = 6, height = 4)
+
+```
+
 #### Visualization
 
 These are the ones that best reflect the analysis
@@ -795,13 +935,13 @@ AIC(aov)
 plot(aov)
 
 #and finally, trying for just year
-aov <- aov(bc_c ~ year, data = soil_fert)
+aov <- aov(bc_c ~ as.factor(sample_date), data = soil_fert)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
 plot(aov)
 
-aov <- aov(total_c_wt_pct ~ year, data = soil_fert)
+aov <- aov(total_c_wt_pct ~ as.factor(sample_date), data = soil_fert)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
@@ -833,24 +973,6 @@ ranova(model)
 emmeans(model, pairwise ~ treatment)
 
 
-model <- lmer(total_c_wt_pct ~ year + (1 | block), data = soil_fert)
-AIC(model)
-summary(model)
-
-#extract random effects and residual values
-re <- ranef(model)
-resid <- augment(model)
-
-#generate qqplot
-plot(re)
-
-#generate plot of fitted vs. residual values
-ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
-
-#ranked likelihood test
-ranova(model)
-
-emmeans(model, pairwise ~ year)
 
 ```
 
@@ -1250,6 +1372,76 @@ emmeans(model, pairwise ~ treatment)
 
 BD in 2024 is significantly higher than 2023; this trend is the same for all mulch treatments. The BD for bare soil trends slightly higher than for mulch treatments. I'm not considering crop, because for soil properties, since we rotated crops, it feels a little weird.
 
+#### For manuscript
+
+##### Statistical Analysis
+
+```{r}
+# Testing difference between years
+aov <- aov(bulk_density ~ year, data = bd)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# Testing difference between treatments for 2023
+aov <- aov(bulk_density ~ treatment, data = subset(bd, year == "2023"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# Testing differences between treatments for 2024
+# here, there's a difference between bare soil and cardboard and between beans and strawberries. I tried with interactions, but the only significant interaction comparing the same types of mulch with different crops or same crops with different mulches was a difference between cardboard for beans and collards
+aov <- aov(bulk_density ~ treatment+crop, data = subset(bd, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# but here, there's no differences between treatments
+aov <- aov(bulk_density ~ treatment, data = subset(bd, year == "2024"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+```
+
+##### Figures and Tables
+
+```{r}
+# average and SD
+sum_stat_bd <- bd %>%
+              group_by(year) %>%
+              summarize(avg_bd = mean(bulk_density, na.rm = TRUE),
+                        sd_bd = sd(bulk_density, na.rm = TRUE))
+
+
+# SI figure:
+
+ggplot(bd, aes(x = year, 
+                   y = bulk_density, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() +
+  ylim(0.75, 1.4) +
+  ylab(bquote("Bulk Density  " (g/cm^3))) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank()) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_discrete(labels = c("May 2023", "Oct 2024"))+
+  annotate("text", x = 1, y = 1.05, label = "a") + 
+  annotate("text", x = 2, y = 1.35, label = "b") +  
+  guides(fill = FALSE)
+
+#ggsave("20250810_SCM_soil_bd.png", width = 6, height = 4)
+
+```
+
 #### Visualization
 
 This is the most relevant visualization for the analysis
@@ -1296,8 +1488,15 @@ ggplot(bd, aes(x = crop, y = bulk_density)) + geom_boxplot()
 
 ```{r}
 
-#there is a significant difference between years, and between DB and AS. but no interactions
-aov <- aov(bulk_density ~ treatment*crop*year, data = bd)
+bd <- bd %>%
+      mutate(first_crop = ifelse(year == "2023" & crop == "AS", "AS",
+                          ifelse(year == "2024" & crop == "AS", "FC",
+                          ifelse(year == "2024" & crop == "DB", "AS",
+                          ifelse(year == "2023" & crop == "FC", "FC",
+                                 "DB")))))
+
+#I changed this up from the original, directly comparing plots, and the only significant difference is for year
+aov <- aov(bulk_density ~ treatment*first_crop*year, data = bd)
 summary(aov)
 TukeyHSD(aov)
 AIC(aov)
@@ -1409,6 +1608,7 @@ emmeans(model, pairwise ~ treatment)
 #### 2024
 ```{r}
 # there's a difference between bare soil and cardboard mulch, and between strawberries and beans, and an interaction effect
+
 aov <- aov(bulk_density ~ treatment*crop, data = subset(bd, year == "2024"))
 summary(aov)
 TukeyHSD(aov)
@@ -1437,7 +1637,7 @@ kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2024" & crop =
 kruskal.test(bulk_density ~ treatment, data = subset(bd, year == "2024" & crop == "FC"))
 
 #LMM for the top model: block is not a significant RE
-model <- lmer(bulk_density ~ treatment + (1 | block), data = subset(bd, year == "2024"))
+model <- lmer(bulk_density ~ treatment*crop + (1 | block), data = subset(bd, year == "2024"))
 AIC(model)
 summary(model)
 
@@ -1454,12 +1654,76 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 #ranked likelihood test
 ranova(model)
 
-emmeans(model, pairwise ~ treatment)
+emmeans(model, pairwise ~ treatment*crop)
 ```
 
 ## Nitrogen
 
 ### Nitrate
+
+#### For manuscript
+
+##### Statistical Analysis
+
+```{r}
+#KW difference between sample dates because the distributions were not normal. See below for KWs showing treatment effect 
+kruskal.test(NO3_ppm ~ as.factor(sample_date), data = soil_fert)
+dunnTest(NO3_ppm ~ as.factor(sample_date), data = soil_fert)
+
+
+```
+
+##### Figures and Tables
+
+```{r}
+# average and SD
+sum_stat_nitrate <- soil_fert %>%
+                group_by(sample_date, treatment) %>%
+                summarize(min_NO3 = min(NO3_ppm, na.rm = TRUE),
+                          median_NO3 = median(NO3_ppm, na.rm = TRUE),
+                          max_NO3 = max(NO3_ppm, na.rm = TRUE),
+                          avg_NO3 = mean(NO3_ppm, na.rm = TRUE),
+                          sd_NO3 = sd(NO3_ppm, na.rm = TRUE))
+
+write.csv(sum_stat_nitrate, here::here("20250812_SCM_nitrate.csv"), row.names=TRUE)
+
+# SI figure:
+
+ggplot(soil_fert, aes(x = as.factor(sample_date), 
+                   y = NO3_ppm, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Nitrate (ppm)") +
+  ylim(0, 65) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "inside",
+        legend.position.inside = c(0.8,0.75)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_discrete(labels = c("Pre-planting May 2023", 
+                              "Post-mulch: 3 wks", 
+                              "Post-mulch: 6 wks", 
+                              "Harvest Oct 2023", 
+                              "Pre-planting May 2024", 
+                              "Post-mulch: 3 wks",
+                              "Post-mulch: 6 wks",
+                              "Harvest Oct 2024")) +
+  annotate("text", x = 1, y = 61, label = "a") + 
+  annotate("text", x = 2, y = 27, label = "bc") +
+  annotate("text", x = 3, y = 27, label = "b") +
+  annotate("text", x = 4, y = 27, label = "bd") +
+  annotate("text", x = 5, y = 27, label = "ac") +
+  annotate("text", x = 6, y = 27, label = "de") +
+  annotate("text", x = 7, y = 27, label = "e") +
+  annotate("text", x = 8, y = 27, label = "e") 
+
+ggsave("20250810_SCM_soil_nitrate.png", width = 6, height = 4)
+
+```
 
 #### Visualization
 
@@ -1869,6 +2133,96 @@ kruskal.test(NO3_ppm ~ treatment, data = subset(soil_fert_24, month == "10" & cr
 
 ### Ammonium
 
+#### For manuscript
+
+##### Statistical Analysis
+
+```{r}
+#KW difference between sample dates because the distributions were not normal. See below for KWs showing treatment effect 
+kruskal.test(NH4_ppm ~ as.factor(sample_date), data = soil_fert)
+dunnTest(NH4_ppm ~ as.factor(sample_date), data = soil_fert)
+
+#significant difference between bare soil and mulches overall. 
+kruskal.test(NH4_ppm ~ treatment, data = soil_fert_24)
+dunnTest(NH4_ppm ~ treatment, data = soil_fert_24)
+
+
+#Sampling #2: normal distribution. BM is significantly different from mulches according to ANOVA and KW. If we consider crops individually, there is a difference between BM and CM for FC.
+aov <- aov(bc_NH4 ~ treatment, data = subset(soil_fert_24, sample_date == "2024-06-20"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert_24, sample_date == "2024-06-20"))
+dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert_24, sample_date == "2024-06-20"))
+
+
+#Sampling #4: difference between bare soil and cardboard mulch
+aov <- aov(bc_NH4 ~ treatment, data = subset(soil_fert_24, month == "10"))
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+
+kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert_24, month == "10"))
+dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert_24, month == "10"))
+
+```
+
+##### Figures and Tables
+
+```{r}
+# average and SD
+sum_stat_NH4 <- soil_fert %>%
+                group_by(sample_date, treatment) %>%
+                summarize(min_NH4 = min(NH4_ppm, na.rm = TRUE),
+                          median_NH4 = median(NH4_ppm, na.rm = TRUE),
+                          max_NH4 = max(NH4_ppm, na.rm = TRUE),
+                          avg_NH4 = mean(NH4_ppm, na.rm = TRUE),
+                          sd_NH4 = sd(NH4_ppm, na.rm = TRUE))
+
+write.csv(sum_stat_NH4, here::here("20250812_SCM_ammonium.csv"), row.names=TRUE)
+
+# SI figure:
+
+ggplot(soil_fert, aes(x = as.factor(sample_date), 
+                   y = NH4_ppm, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Ammonium (ppm)") +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "inside",
+        legend.position.inside = c(0.8,0.75)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_discrete(labels = c("Pre-planting May 2023", 
+                              "Post-mulch: 3 wks", 
+                              "Post-mulch: 6 wks", 
+                              "Harvest Oct 2023", 
+                              "Pre-planting May 2024", 
+                              "Post-mulch: 3 wks",
+                              "Post-mulch: 6 wks",
+                              "Harvest Oct 2024")) +
+  annotate("text", x = 1, y = 11, label = "ab") + 
+  annotate("text", x = 2, y = 11, label = "cd") +
+  annotate("text", x = 3, y = 11, label = "d") +
+  annotate("text", x = 4, y = 11, label = "b") +
+  annotate("text", x = 5, y = 11, label = "ab") +
+  annotate("text", x = 6, y = 11, label = "ac") +
+  annotate("text", x = 7, y = 11, label = "ab") +
+  annotate("text", x = 8, y = 11, label = "ac") + 
+  guides(fill = FALSE)
+
+ggsave("20250812_SCM_soil_ammonium.png", width = 6, height = 4)
+
+```
+
 #### Visualization
 
 ```{r}
@@ -2223,7 +2577,7 @@ dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert_24, sample_date == "2024-0
 
 
 #LMM: block is not a significant RE
-model <- lmer(NH4_ppm ~ treatment + (1 | block), data = subset(soil_fert_24, sample_date == "2024-06-20"))
+model <- lmer(bc_NH4 ~ treatment + (1 | block), data = subset(soil_fert_24, sample_date == "2024-06-20"))
 AIC(model)
 summary(model)
 
@@ -2327,6 +2681,68 @@ emmeans(model, pairwise ~ treatment)
 
 ### Total Nitrogen
 
+#### For manuscript
+
+##### Statistical Analysis
+
+```{r}
+# LMM: block is a significant random effect. Adding treatment increases the AIC by quite a bit
+model <- lmer(total_n_wt_pct ~ as.factor(sample_date) + (1 | block), data = soil_fert)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ as.factor(sample_date))
+
+
+```
+
+##### Figures and Tables
+
+```{r}
+# average and SD
+sum_stat_n <- soil_fert %>%
+              group_by(sample_date) %>%
+              summarize(avg_n = mean(total_n_wt_pct, na.rm = TRUE),
+                        sd_n = sd(total_n_wt_pct, na.rm = TRUE))
+
+
+# SI figure:
+
+ggplot(data = subset(soil_fert, month == 5 | month == 10), aes(x = as.factor(sample_date), 
+                   y = total_n_wt_pct, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Total N (% of weight)") +
+  ylim(0.28, 0.38) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank()) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_discrete(labels = c("May 2023", "Oct 2023", "May 2024", "Oct 2024")) +
+  annotate("text", x = 1, y = 0.377, label = "a") + 
+  annotate("text", x = 2, y = 0.377, label = "b") +
+  annotate("text", x = 3, y = 0.377, label = "bc") +
+  annotate("text", x = 4, y = 0.377, label = "c") 
+
+ggsave("20250811_SCM_soil_n.png", width = 6, height = 4)
+
+```
+
 #### Visualization
 
 These are the most relevant visualizations
@@ -2422,6 +2838,12 @@ TukeyHSD(aov)
 AIC(aov)
 plot(aov)
 
+aov <- aov(total_n_wt_pct ~ as.factor(sample_date), data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
 #there is a significant different between study years, but not between treatments and crops. 
 
 kruskal.test(total_n_wt_pct ~ treatment, data = soil_fert)
@@ -2433,7 +2855,7 @@ kruskal.test(total_n_wt_pct ~ year, data = subset(soil_fert, treatment == "SM"))
 kruskal.test(total_n_wt_pct ~ year, data = subset(soil_fert, treatment == "CM"))
 
 # LMM for the best ANOVA: block is a significant random effect
-model <- lmer(total_n_wt_pct ~ year + (1 | block), data = soil_fert)
+model <- lmer(total_n_wt_pct ~ as.factor(sample_date) + (1 | block), data = soil_fert)
 AIC(model)
 summary(model)
 
@@ -2450,7 +2872,7 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 #ranked likelihood test
 ranova(model)
 
-emmeans(model, pairwise ~ year)
+emmeans(model, pairwise ~ as.factor(sample_date))
 
 
 ```
@@ -2868,6 +3290,62 @@ emmeans(model, pairwise ~ treatment)
 
 ## C:N Ratio
 
+#### For manuscript
+
+##### Statistical Analysis
+
+```{r}
+# ANOVA because block was not a significant RE for the LMM
+aov <- aov(cn_ratio ~ as.factor(sample_date), data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# And KW because I'm not convinced it meets model assumptions
+kruskal.test(cn_ratio ~ as.factor(sample_date), data = soil_fert)
+dunnTest(cn_ratio ~ as.factor(sample_date), data = soil_fert)
+
+
+```
+
+##### Figures and Tables
+
+```{r}
+# average and SD
+sum_stat_cn <- soil_fert %>%
+               group_by(sample_date) %>%
+               summarize(avg_cn = mean(cn_ratio, na.rm = TRUE),
+                         sd_cn = sd(cn_ratio, na.rm = TRUE))
+
+
+# SI figure:
+
+ggplot(data = subset(soil_fert, month == 5 | month == 10), aes(x = as.factor(sample_date), 
+                   y = cn_ratio, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("C:N Ratio") +
+  ylim(10.25, 13.5) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "inside",
+        legend.position.inside = c(0.15,0.84)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
+  scale_x_discrete(labels = c("May 2023", "Oct 2023", "May 2024", "Oct 2024")) +
+  annotate("text", x = 1, y = 12.1, label = "a") + 
+  annotate("text", x = 2, y = 12.1, label = "ab") +
+  annotate("text", x = 3, y = 12.1, label = "b") +
+  annotate("text", x = 4, y = 13.4, label = "c") 
+
+ggsave("20250811_SCM_soil_cn_ratio.png", width = 6, height = 4)
+
+```
+
+
 ### Visualization
 
 These are the visualizations that are most representative of the results:
@@ -2953,10 +3431,19 @@ TukeyHSD(aov)
 AIC(aov)
 plot(aov)
 
+# trying by sample date
+aov <- aov(cn_ratio ~ as.factor(sample_date), data = soil_fert)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
 #there is a significant different between study years, but not between treatments and crops. 
 
 kruskal.test(cn_ratio ~ treatment, data = soil_fert)
 kruskal.test(cn_ratio ~ crop, data = soil_fert)
+kruskal.test(cn_ratio ~ as.factor(sample_date), data = soil_fert)
+dunnTest(cn_ratio ~ as.factor(sample_date), data = soil_fert)
 
 kruskal.test(cn_ratio ~ year, data = soil_fert)
 kruskal.test(cn_ratio ~ year, data = subset(soil_fert, treatment == "BM"))
@@ -2964,6 +3451,8 @@ kruskal.test(cn_ratio ~ year, data = subset(soil_fert, treatment == "SM"))
 kruskal.test(cn_ratio ~ year, data = subset(soil_fert, treatment == "CM"))
 
 ```
+
+
 ```{r}
 #difference between years but not treatments, comparing start and end of study
 aov <- aov(cn_ratio ~ treatment*year, data = subset(soil_fert, sample_date == "2023-05-23" | sample_date == "2024-10-17"))
