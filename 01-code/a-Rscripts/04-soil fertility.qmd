@@ -88,6 +88,9 @@ bd <- bd %>%
 
 ```{r}
 
+test <- subset(soil_fert, sample_date > "2024-08-31" & treatment == "CM")
+
+
 #really just doing this for the initial soil properties, but figured might as well do it for all dates
 avg_trt <- soil_fert %>%
                 group_by(sample_date, treatment) %>%
@@ -774,7 +777,7 @@ emmeans(model, pairwise ~ crop)
 
 ```{r}
 #LMM comparing treatment and sample dates
-model <- lmer(total_c_wt_pct ~ treatment*as.factor(sample_date) + (1 | block), data = soil_fert)
+model <- lmer(total_c_wt_pct ~ as.factor(sample_date) + (1 | block), data = soil_fert)
 AIC(model)
 summary(model)
 
@@ -792,6 +795,7 @@ ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
 ranova(model)
 
 emmeans(model, pairwise ~ as.factor(sample_date))
+
 
 ```
 
@@ -823,13 +827,13 @@ ggplot(data = subset(soil_fert, month == 5 | month == 10), aes(x = as.factor(sam
                     labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
                     values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) +
   scale_x_discrete(labels = c("May 2023", "Oct 2023", "May 2024", "Oct 2024")) +
-  annotate("text", x = 1, y = 4.2, label = "a") + 
-  annotate("text", x = 2, y = 4.2, label = "ab") +
-  annotate("text", x = 3, y = 4.2, label = "b") +
-  annotate("text", x = 4, y = 4.6, label = "c") +
+  annotate("text", x = 1, y = 4.2, label = "A") + 
+  annotate("text", x = 2, y = 4.2, label = "AB") +
+  annotate("text", x = 3, y = 4.2, label = "B") +
+  annotate("text", x = 4, y = 4.6, label = "C") +
   guides(fill = FALSE)
 
-#ggsave("20250810_SCM_soil_c.png", width = 6, height = 4)
+ggsave("20251013_SCM_soil_c.png", width = 6, height = 4)
 
 ```
 
@@ -1678,7 +1682,7 @@ dunnTest(NO3_ppm ~ as.factor(sample_date), data = soil_fert)
 ```{r}
 # average and SD
 sum_stat_nitrate <- soil_fert %>%
-                group_by(sample_date, treatment) %>%
+                group_by(sample_date) %>%
                 summarize(min_NO3 = min(NO3_ppm, na.rm = TRUE),
                           median_NO3 = median(NO3_ppm, na.rm = TRUE),
                           max_NO3 = max(NO3_ppm, na.rm = TRUE),
@@ -1712,16 +1716,16 @@ ggplot(soil_fert, aes(x = as.factor(sample_date),
                               "Post-mulch: 3 wks",
                               "Post-mulch: 6 wks",
                               "Harvest Oct 2024")) +
-  annotate("text", x = 1, y = 61, label = "a") + 
-  annotate("text", x = 2, y = 27, label = "bc") +
-  annotate("text", x = 3, y = 27, label = "b") +
-  annotate("text", x = 4, y = 27, label = "bd") +
-  annotate("text", x = 5, y = 27, label = "ac") +
-  annotate("text", x = 6, y = 27, label = "de") +
-  annotate("text", x = 7, y = 27, label = "e") +
-  annotate("text", x = 8, y = 27, label = "e") 
+  annotate("text", x = 1, y = 61, label = "A") + 
+  annotate("text", x = 2, y = 27, label = "BC") +
+  annotate("text", x = 3, y = 27, label = "B") +
+  annotate("text", x = 4, y = 27, label = "BD") +
+  annotate("text", x = 5, y = 27, label = "AC") +
+  annotate("text", x = 6, y = 27, label = "DE") +
+  annotate("text", x = 7, y = 27, label = "E") +
+  annotate("text", x = 8, y = 27, label = "E") 
 
-ggsave("20250810_SCM_soil_nitrate.png", width = 6, height = 4)
+ggsave("20250916_SCM_soil_nitrate.png", width = 6, height = 4)
 
 ```
 
@@ -2176,7 +2180,7 @@ dunnTest(NH4_ppm ~ treatment, data = subset(soil_fert_24, month == "10"))
 ```{r}
 # average and SD
 sum_stat_NH4 <- soil_fert %>%
-                group_by(sample_date, treatment) %>%
+                group_by(sample_date) %>%
                 summarize(min_NH4 = min(NH4_ppm, na.rm = TRUE),
                           median_NH4 = median(NH4_ppm, na.rm = TRUE),
                           max_NH4 = max(NH4_ppm, na.rm = TRUE),
@@ -2209,17 +2213,23 @@ ggplot(soil_fert, aes(x = as.factor(sample_date),
                               "Post-mulch: 3 wks",
                               "Post-mulch: 6 wks",
                               "Harvest Oct 2024")) +
-  annotate("text", x = 1, y = 11, label = "ab") + 
-  annotate("text", x = 2, y = 11, label = "cd") +
-  annotate("text", x = 3, y = 11, label = "d") +
-  annotate("text", x = 4, y = 11, label = "b") +
-  annotate("text", x = 5, y = 11, label = "ab") +
-  annotate("text", x = 6, y = 11, label = "ac") +
-  annotate("text", x = 7, y = 11, label = "ab") +
-  annotate("text", x = 8, y = 11, label = "ac") + 
+  annotate("text", x = 1, y = 11, label = "AB") + 
+  annotate("text", x = 2, y = 11, label = "CD") +
+  annotate("text", x = 3, y = 11, label = "D") +
+  annotate("text", x = 4, y = 11, label = "B") +
+  annotate("text", x = 5, y = 11, label = "AB") +
+  annotate("text", x = 5.75, y = 7.5, label = "a") +
+  annotate("text", x = 6, y = 7.5, label = "b") +
+  annotate("text", x = 6, y = 11, label = "AC") +
+  annotate("text", x = 6.25, y = 7.5, label = "b") +
+  annotate("text", x = 7, y = 11, label = "AB") +
+  annotate("text", x = 7.75, y = 7.5, label = "a") +
+  annotate("text", x = 8, y = 7.5, label = "b") +
+  annotate("text", x = 8, y = 11, label = "AC") +
+  annotate("text", x = 8.25, y = 7.5, label = "b") + 
   guides(fill = FALSE)
 
-ggsave("20250812_SCM_soil_ammonium.png", width = 6, height = 4)
+ggsave("20250916_SCM_soil_ammonium.png", width = 6, height = 4)
 
 ```
 
@@ -2333,6 +2343,7 @@ plot(aov)
 
 #there is not a significant difference between treatments or crops in 2023, nor is there a difference between crops within treatments
 kruskal.test(NH4_ppm ~ treatment, data =soil_fert_23)
+dunnTest(NH4_ppm ~ treatment, data =soil_fert_23)
 kruskal.test(NH4_ppm ~ crop, data = soil_fert_23)
 kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert_23, crop == "AS"))
 kruskal.test(NH4_ppm ~ treatment, data = subset(soil_fert_23, crop == "DB"))
@@ -2714,12 +2725,24 @@ emmeans(model, pairwise ~ as.factor(sample_date))
 ```{r}
 # average and SD
 sum_stat_n <- soil_fert %>%
-              group_by(sample_date) %>%
-              summarize(avg_n = mean(total_n_wt_pct, na.rm = TRUE),
+              group_by(treatment, sample_date) %>%
+              summarize(min = min(total_n_wt_pct, na.rm = TRUE),
+                        median = median(total_n_wt_pct, na.rm = TRUE),
+                        max = max(total_n_wt_pct, na.rm = TRUE),
+                        avg_n = mean(total_n_wt_pct, na.rm = TRUE),
                         sd_n = sd(total_n_wt_pct, na.rm = TRUE))
 
 
 # SI figure:
+
+ggplot(data = subset(soil_fert, month == 5 | month == 10), aes(x = as.factor(sample_date), 
+                   y = total_n_wt_pct)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Total N (% of weight)") +
+  ylim(0.28, 0.38) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank())
 
 ggplot(data = subset(soil_fert, month == 5 | month == 10), aes(x = as.factor(sample_date), 
                    y = total_n_wt_pct, 
@@ -3314,8 +3337,11 @@ dunnTest(cn_ratio ~ as.factor(sample_date), data = soil_fert)
 ```{r}
 # average and SD
 sum_stat_cn <- soil_fert %>%
-               group_by(sample_date) %>%
-               summarize(avg_cn = mean(cn_ratio, na.rm = TRUE),
+               group_by(treatment, sample_date) %>%
+               summarize(min = min(cn_ratio, na.rm = TRUE),
+                         median = median(cn_ratio, na.rm = TRUE),
+                         max = max(cn_ratio, na.rm = TRUE),
+                          avg_cn = mean(cn_ratio, na.rm = TRUE),
                          sd_cn = sd(cn_ratio, na.rm = TRUE))
 
 

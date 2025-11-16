@@ -30,6 +30,25 @@ spad <- read.csv(here::here("00-data", "b-prepared",
 
 ```
 
+## calculating total yield
+```{r}
+total <- yield %>%
+        dplyr::select(-notes, biomass_g) %>%
+        mutate(date_collected = lubridate::as_date(date_collected, 
+                                                   format = "%m/%d/%Y"),
+               year = lubridate::isoyear(ymd(date_collected)),
+               month = lubridate::month(date_collected),
+               week = lubridate::isoweek(ymd(date_collected))) %>%
+        mutate_at(c('block', 'plot', 'treatment', 
+                    'crop', "year", "week", "month"), 
+                  as.factor) %>%
+        group_by(crop) %>%
+        summarize(all_yield = sum(total_g, na.rm = TRUE)) %>%
+        ungroup
+
+```
+
+
 ## Format Data
 
 ### yield
@@ -108,6 +127,8 @@ yield_yr_FC <- subset(yield_yr, crop == "FC")
 yield_23_FC <- subset(yield_yr_FC, year == "2023")
 yield_24_FC <- subset(yield_yr_FC, year == "2024")
 ```
+
+
 #### Transformations
 
 ##### Weekly yield
@@ -251,7 +272,7 @@ spad_out <- spad
 
 #### Strawberries
 
-There are 26 potential outliers. Except for a plant where all three readings were high in 1-B on 7/16/2024, others were individually elevated readings. Only one one was lower than the lower bound. 
+There are 24 potential outliers. Except for a plant where all three readings were high in 1-B on 7/16/2024, others were individually elevated readings. Only one one was lower than the lower bound. 
 ```{r}
 Q1 <- quantile(spad_AS$value, 0.25, na.rm = TRUE) 
 Q3 <- quantile(spad_AS$value, 0.75, na.rm = TRUE) 
@@ -287,7 +308,7 @@ spad_23_AS_out$bc_value <- (spad_23_AS_out$value ^ lambda -1)/lambda
 
 #### Beans
 
-Wowza, 78 potential outliers identified. I'm tempted to do the same here, where I adjust the range a little to keep > 10 and < 50
+Wowza, 73 potential outliers identified. I'm tempted to do the same here, where I adjust the range a little to keep > 10 and < 50
 ```{r}
 Q1 <- quantile(spad_DB$value, 0.25, na.rm = TRUE) 
 Q3 <- quantile(spad_DB$value, 0.75, na.rm = TRUE) 
@@ -313,7 +334,7 @@ spad_24_DB_out <- subset(spad_DB_out, year == "2024")
 ```
 
 #### Collards
-88 potential outliers! All but one above the upper bound. I feel more comfortable removing that one. 
+87 potential outliers! All but one above the upper bound. I feel more comfortable removing that one. 
 ```{r}
 Q1 <- quantile(spad_FC$value, 0.25, na.rm = TRUE) 
 Q3 <- quantile(spad_FC$value, 0.75, na.rm = TRUE) 
@@ -469,222 +490,7 @@ ggplot(subset(yield, crop == "FC"), aes(x = treatment, y = total_g)) + geom_boxp
 
 ## Annual Yield
 
-#### For manuscript
 
-##### Statistical Analysis
-Strawberries
-```{r}
-# 2023: there is a significant difference between bare soil and the mulches
-aov <- aov(total_g ~ treatment, data = yield_23_AS)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-#there is not a significant difference between treatments. model assumptions are met.
-aov <- aov(per_market ~ treatment, data = yield_23_AS)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-# 2024: there is a significant difference between bare soil and the mulches
-aov <- aov(total_g ~ treatment, data = yield_24_AS)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-
-
-# 2024: There was a significant difference between CM and BM for percent marketable strawberry yield
-
-kruskal.test(per_market ~ treatment, data = yield_24_AS)
-dunnTest(per_market ~ treatment, data = yield_24_AS)
-
-
-
-```
-
-Beans
-```{r}
-#overall: While the dataset is non-parametric, it seems to meet assumptions. I tried the boxcox transformed version (which is also not normally distributed), and it definitely did not meet assumptions. There is a difference between years, but not treatments 
-aov <- aov(total_g ~ treatment*year, data = yield_yr_DB)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-# There is not a significant difference between years for percent marketable yield
-kruskal.test(per_market ~ year, data = yield_yr_DB)
-
-# 2023: there is a nearly significant difference between BM and SM
-aov <- aov(total_g ~ treatment, data = yield_23_DB)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-# 2024: there is no significant difference between treatments
-aov <- aov(bc_total ~ treatment, data = yield_24_DB)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-# 2023: Pretty sure everything was 100%
-kruskal.test(per_market ~ treatment, data = yield_23_DB)
-
-# 2024: Bare soil is significantly less than straw, nearly significantly less than cardboard
-kruskal.test(per_market ~ treatment, data = yield_24_DB)
-dunnTest(per_market ~ treatment, data =yield_24_DB)
-
-```
-
-Collards
-```{r}
-# There is was a significant difference in treatment, but there is between years
-aov <- aov(total_g ~ treatment*year, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-#running KW, just to check
-kruskal.test(total_g ~ year, data = yield_yr_FC)
-
-# there is not a significant difference between treatments
-aov <- aov(per_market ~ treatment, data = yield_yr_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-kruskal.test(per_market ~ treatment, data = yield_yr_FC)
-
-
-# 2023: no difference between treatments
-aov <- aov(cubic_total ~ treatment, data = yield_23_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-kruskal.test(total_g ~ treatment, data = yield_23_FC)
-
-
-aov <- aov(per_market ~ treatment, data = yield_23_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-kruskal.test(per_market ~ treatment, data = yield_23_FC)
-
-# 2024: no treatment differences
-aov <- aov(total_g ~ treatment, data = yield_24_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-# 2024: tried the transformed dataset as well, and it didn't make a huge difference in model quality
-aov <- aov(per_market ~ treatment, data = yield_24_FC)
-summary(aov)
-TukeyHSD(aov)
-AIC(aov)
-plot(aov)
-
-kruskal.test(per_market ~ treatment, data = subset(yield_yr_FC, year == "2024"))
-
-```
-
-##### Figures and Tables
-
-
-```{r}
-# average and SD
-yield_yr$total_kg <- yield_yr$total_g/1000
-
-sum_stat_yield <- yield_yr %>%
-                    group_by(year, crop, treatment) %>%
-                    summarize(min_yield = min(total_kg, na.rm = TRUE),
-                              median_yield = median(total_kg, na.rm = TRUE),
-                              max_yield = max(total_kg, na.rm = TRUE),
-                              avg_yield = mean(total_kg, na.rm = TRUE),
-                              sd_yield = sd(total_kg, na.rm = TRUE))
-
-sum_stat_per <- yield_yr %>%
-                    group_by(year, crop, treatment) %>%
-                    summarize(min_yield = min(per_market, na.rm = TRUE),
-                              median_yield = median(per_market, na.rm = TRUE),
-                              max_yield = max(per_market, na.rm = TRUE),
-                              avg_yield = mean(per_market, na.rm = TRUE),
-                              sd_yield = sd(per_market, na.rm = TRUE))
-
-write.csv(sum_stat_per, here::here("20250813_SCM_marketable.csv"), row.names=TRUE)
-
-dat_text <- data.frame(
-  label = c("a", "a", "a", "?", "?", "?", "?", "?", "?"),
-  crop   = c("AS", "AS", "AS", "DB", "DB", "DB", "FC", "FC", "FC")
-)
-
-dat_text$crop <- as.factor(dat_text$crop) 
-
-# total yield
-
-ggplot(yield_yr, aes(x = year, 
-                   y = total_kg, 
-                   fill = treatment)) + 
-  geom_boxplot() + 
-  theme_bw() + 
-  ylab("Total Yield (kg)") +
-  facet_wrap(~crop, scales = "free_y", labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
-  theme(axis.title.y = element_text(vjust = 3),
-        axis.title.x = element_blank()) +
-  scale_fill_manual(name = "Mulch Treatment", 
-                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
-                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) + 
-  guides(fill = FALSE)
-
-ggsave("20250813_SCM_yield.png")
-
-ggplot(yield_yr, aes(x = year, 
-                   y = per_market, 
-                   fill = treatment)) + 
-  geom_boxplot() + 
-  theme_bw() + 
-  ylab("Marketable Yield (as % of total yield)") +
-  facet_wrap(~crop, labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
-  theme(axis.title.y = element_text(vjust = 3),
-        axis.title.x = element_blank(),
-        legend.position = "inside",
-        legend.position.inside = c(0.5,0.25)) +
-  scale_fill_manual(name = "Mulch Treatment", 
-                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
-                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
-  
-  ggsave("20250813_SCM_marketable.png")
-  
-
-
-ggplot(yield_wk, aes(x = week, 
-                   y = total_g, 
-                   fill = treatment)) + 
-  geom_boxplot() + 
-  theme_bw() + 
-  facet_wrap(~year + crop, scales = "free_y", labeller = as_labeller(c("2023" = "2023", "2024" = "2024", AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
-  xlab("Weeks after January 1") +
-  ylab("Total Yield (g)") +
-  theme(axis.title.y = element_text(vjust = 3),
-        legend.position = "top",
-        axis.text.x = element_text(angle = 45)) +
-  scale_fill_manual(name = "Mulch Treatment", 
-                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
-                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
-
-ggsave("20250813_SCM_yield_week.png", width = 9, height = 6)
-  
-
-```
 
 ### Visualizations
 
@@ -2350,6 +2156,219 @@ emmeans(model, pairwise ~ treatment)
 
 ```
 
+#### For manuscript
+
+##### Statistical Analysis
+Strawberries
+```{r}
+# overall
+kruskal.test(total_g ~ year, data = yield_yr_AS)
+
+# 2023: there is a significant difference between bare soil and the mulches
+aov <- aov(total_g ~ treatment, data = yield_23_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+#there is not a significant difference between treatments. model assumptions are met.
+aov <- aov(per_market ~ treatment, data = yield_23_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2024: there is a significant difference between bare soil and the mulches
+aov <- aov(total_g ~ treatment, data = yield_24_AS)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+
+
+# 2024: There was a significant difference between CM and BM for percent marketable strawberry yield
+
+kruskal.test(per_market ~ treatment, data = yield_24_AS)
+dunnTest(per_market ~ treatment, data = yield_24_AS)
+
+
+
+```
+
+Beans
+```{r}
+#overall: While the dataset is non-parametric, it seems to meet assumptions. I tried the boxcox transformed version (which is also not normally distributed), and it definitely did not meet assumptions. There is a difference between years, but not treatments 
+aov <- aov(total_g ~ treatment*year, data = yield_yr_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# There is not a significant difference between years for percent marketable yield
+kruskal.test(per_market ~ year, data = yield_yr_DB)
+
+# 2023: there is a nearly significant difference between BM and SM
+aov <- aov(total_g ~ treatment, data = yield_23_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2024: there is no significant difference between treatments
+aov <- aov(bc_total ~ treatment, data = yield_24_DB)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2023: Pretty sure everything was 100%
+kruskal.test(per_market ~ treatment, data = yield_23_DB)
+
+# 2024: Bare soil is significantly less than straw, nearly significantly less than cardboard
+kruskal.test(per_market ~ treatment, data = yield_24_DB)
+dunnTest(per_market ~ treatment, data =yield_24_DB)
+
+```
+
+Collards
+```{r}
+# Overall
+kruskal.test(total_g ~ year, data = yield_yr_FC)
+
+# there is not a significant difference between treatments
+aov <- aov(per_market ~ treatment, data = yield_yr_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(per_market ~ treatment, data = yield_yr_FC)
+
+
+# 2023: no difference between treatments
+aov <- aov(cubic_total ~ treatment, data = yield_23_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(total_g ~ treatment, data = yield_23_FC)
+
+
+aov <- aov(per_market ~ treatment, data = yield_23_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(per_market ~ treatment, data = yield_23_FC)
+
+# 2024: no treatment differences
+aov <- aov(total_g ~ treatment, data = yield_24_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+# 2024: tried the transformed dataset as well, and it didn't make a huge difference in model quality
+aov <- aov(per_market ~ treatment, data = yield_24_FC)
+summary(aov)
+TukeyHSD(aov)
+AIC(aov)
+plot(aov)
+
+kruskal.test(per_market ~ treatment, data = subset(yield_yr_FC, year == "2024"))
+
+```
+
+##### Figures and Tables
+
+
+```{r}
+# average and SD
+yield_yr$total_kg_m2 <- ((yield_yr$total_g/30) * (1/0.3048^2) * (1/1000))
+
+sum_stat_yield <- yield_yr %>%
+                    group_by(year, crop, treatment) %>%
+                    summarize(min_yield = min(total_kg_m2, na.rm = TRUE),
+                              median_yield = median(total_kg_m2, na.rm = TRUE),
+                              max_yield = max(total_kg_m2, na.rm = TRUE),
+                              avg_yield = mean(total_kg_m2, na.rm = TRUE),
+                              sd_yield = sd(total_kg_m2, na.rm = TRUE))
+
+sum_stat_per <- yield_yr %>%
+                    group_by(year, crop, treatment) %>%
+                    summarize(min_yield = min(per_market, na.rm = TRUE),
+                              median_yield = median(per_market, na.rm = TRUE),
+                              max_yield = max(per_market, na.rm = TRUE),
+                              avg_yield = mean(per_market, na.rm = TRUE),
+                              sd_yield = sd(per_market, na.rm = TRUE))
+
+write.csv(sum_stat_yield, here::here("20250915_SCM_total_yield.csv"), row.names=TRUE)
+
+dat_text <- data.frame(
+  label = c("a", "a", "a", "?", "?", "?", "?", "?", "?"),
+  crop   = c("AS", "AS", "AS", "DB", "DB", "DB", "FC", "FC", "FC")
+)
+
+dat_text$crop <- as.factor(dat_text$crop) 
+
+# total yield
+
+ggplot(yield_yr, aes(x = year, 
+                   y = total_kg_m2, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab(bquote("Total Yield  " (kg/m^2))) +
+  facet_wrap(~crop, scales = "free_y", labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "top") +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6"))   
+
+ggsave("20250915_SCM_yield.png", width = 6, height = 4)
+
+ggplot(yield_yr, aes(x = year, 
+                   y = per_market, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  ylab("Marketable Yield (as % of total yield)") +
+  facet_wrap(~crop, labeller = as_labeller(c(AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  theme(axis.title.y = element_text(vjust = 3),
+        axis.title.x = element_blank(),
+        legend.position = "inside",
+        legend.position.inside = c(0.5,0.25)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
+  
+  ggsave("20250813_SCM_marketable.png")
+  
+
+
+ggplot(yield_wk, aes(x = week, 
+                   y = total_g, 
+                   fill = treatment)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  facet_wrap(~year + crop, scales = "free_y", labeller = as_labeller(c("2023" = "2023", "2024" = "2024", AS = "Strawberries", DB = "Beans", FC = "Collards"))) +
+  xlab("Weeks after January 1") +
+  ylab("Total Yield (g)") +
+  theme(axis.title.y = element_text(vjust = 3),
+        legend.position = "top",
+        axis.text.x = element_text(angle = 45)) +
+  scale_fill_manual(name = "Mulch Treatment", 
+                    labels = c("Bare soil", "Shredded Cardboard", "Straw"), 
+                    values = c("#A6CEE3", "#6A3D9A", "#CAB2D6")) 
+
+ggsave("20250813_SCM_yield_week.png", width = 9, height = 6)
+  
+
+```
+
 ## Foliar Chlorophyll
 
 
@@ -2409,6 +2428,24 @@ TukeyHSD(aov)
 AIC(aov)
 plot(aov)
 
+model <- lmer(value ~ treatment + (1 | date_collected), data = spad_24_AS)
+AIC(model)
+summary(model)
+
+#extract random effects and residual values
+re <- ranef(model)
+resid <- augment(model)
+
+#generate qqplot
+plot(re)
+
+#generate plot of fitted vs. residual values
+ggplot(resid, aes(x = .fitted, y = .resid)) + geom_point() + stat_smooth(se = F)
+
+#ranked likelihood test
+ranova(model)
+
+emmeans(model, pairwise ~ treatment)
 
 
 ```

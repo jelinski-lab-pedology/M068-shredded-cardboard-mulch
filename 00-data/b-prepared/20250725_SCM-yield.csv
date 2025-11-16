@@ -527,7 +527,7 @@ date_collected,block,plot,treatment,crop,direction,marketable_g,unmarketable_g,t
 7/21/2023,4,E,BM,DB,east,5,0,5,NA,"full row, little sparse"
 7/21/2023,4,H,SM,DB,west,532,0,532,NA,full row
 7/21/2023,4,H,SM,DB,east,680,0,680,NA,full row
-7/21/2023,edge,edge,edge,edge,NA,NA,NA,11761,NA,
+7/21/2023,edge,edge,edge,DB,NA,NA,NA,11761,NA,
 7/24/2023,1,A,SM,AS,NA,0,0,0,NA,
 7/24/2023,1,B,BM,FC,NA,655,110,765,NA,
 7/24/2023,1,C,CM,DB,east,298,0,298,NA,
